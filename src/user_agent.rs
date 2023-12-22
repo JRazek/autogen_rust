@@ -6,24 +6,16 @@ use futures::{
     Sink, SinkExt, Stream, StreamExt,
 };
 
-use crate::{agent_traits::AgentProxy, chat::TextChat};
+use crate::agent_traits::AgentProxy;
 
-pub enum Message {
-    Text(String),
-}
+use super::chat::ChatMessage as Message;
 
-pub struct UserAgent<S> {
+pub struct UserAgentProxy<S> {
     rx: S,
     tx: Sender<Message>,
 }
 
-impl<S> UserAgent<S> {
-    pub fn with_stream(stream: S) -> Self {
-        todo!()
-    }
-}
-
-impl<S> Stream for UserAgent<S>
+impl<S> Stream for UserAgentProxy<S>
 where
     S: Stream<Item = Message> + Unpin,
 {
@@ -37,9 +29,9 @@ where
     }
 }
 
-impl<S> Sink<Message> for UserAgent<S>
+impl<S> Sink<Message> for UserAgentProxy<S>
 where
-    for<'a> Pin<&'a mut UserAgent<S>>: DerefMut<Target = Self>,
+    for<'a> Pin<&'a mut UserAgentProxy<S>>: DerefMut<Target = Self>,
 {
     type Error = SendError;
 
@@ -67,11 +59,4 @@ where
     ) -> std::task::Poll<Result<(), Self::Error>> {
         self.tx.poll_close_unpin(cx)
     }
-}
-
-impl<S> AgentProxy<Message> for UserAgent<S>
-where
-    for<'a> Pin<&'a mut UserAgent<S>>: DerefMut<Target = Self>,
-    S: Stream<Item = Message> + Unpin,
-{
 }

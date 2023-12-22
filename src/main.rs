@@ -5,15 +5,14 @@ mod chat;
 mod user_agent;
 
 use agent_traits::AgentProxy;
-use user_agent::UserAgent;
+use user_agent::UserAgentProxy;
+
+use chat::ChatMessage as Message;
 
 use chat::TextChat;
 
-struct LlmAgent;
+use futures::StreamExt;
 
 fn main() {
-    let stdin_lock = std::io::stdin();
-    let user_agent = UserAgent::with_stream(stdin_lock);
-
-    let chat = TextChat;
+    let chat = TextChat::default();
 }

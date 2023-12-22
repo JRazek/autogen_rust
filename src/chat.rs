@@ -1,34 +1,55 @@
-use std::sync::mpsc::Sender;
+use crate::agent_traits::{Agent, AgentProxy};
 
-use crate::{agent_traits::AgentProxy, user_agent::Message};
+use futures::channel::mpsc::{channel, Sender};
 
-use futures::channel::mpsc::SendError;
-
-pub struct AgentChatHandle<Y> {
-    //    agent: T,
-    chat_tx: Sender<Y>,
-}
-
-pub struct ChatMessage<T> {
+pub struct ChatMessage {
     sender: String,
     recipient: String,
-    message: T,
+    message: MessageContent,
 }
 
-pub struct TextChat;
+pub enum MessageContent {
+    Text(String),
+}
 
-use futures::{SinkExt, StreamExt};
+type ChatHistory = Vec<ChatMessage>;
+
+pub struct TextChat {
+    agents_turn_tx: Vec<Sender<ChatHistory>>,
+}
+
+impl Default for TextChat {
+    fn default() -> Self {
+        Self {
+            agents_turn_tx: Vec::new(),
+        }
+    }
+}
+
+use futures::StreamExt;
 
 impl TextChat {
-    fn spawn_agent<A: AgentProxy<ChatMessage<T>>, T>(
-        &self,
-        agent_name: impl ToOwned<Owned = String>,
-        agent_proxy: A,
-    ) -> AgentChatHandle<Message> {
-        let (agent_tx, agent_rx) = agent_proxy.split();
+    pub fn spawn_agent<A>(&mut self, agent_name: impl ToOwned<Owned = String>, agent: A)
+    where
+        A: Agent<ChatMessage> + Send + Clone + 'static,
+    {
+        let (turn_tx, turn_rx) = channel(1);
 
-        let rx_task = async move {};
+        self.agents_turn_tx.push(turn_tx);
 
-        todo!()
+        let turn_task = turn_rx.for_each(move |chat_history| {
+            let agent = agent.clone();
+            async move {
+                let (agent_proxy_tx, agent_proxy_rx) = agent.take_turn(chat_history).split();
+
+                todo!()
+            }
+        });
+
+        tokio::spawn(turn_task);
     }
+}
+
+pub struct AgentChatHandle<T> {
+    chat_tx: Sender<T>,
 }
