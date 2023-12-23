@@ -9,7 +9,7 @@ use tracing::{debug, info, trace};
 
 mod channel;
 mod error;
-mod scheduler;
+pub mod scheduler;
 
 #[derive(Clone, Debug)]
 pub struct ChatMessage {
@@ -48,7 +48,7 @@ impl TextChat {
     pub fn spawn_agent<A>(&mut self, agent_name: impl ToOwned<Owned = String>, agent: A)
     where
         A: Agent<ChatMessage> + Send + Clone + 'static,
-        <A as Agent<ChatMessage>>::Proxy: Send + Clone,
+        <A as Agent<ChatMessage>>::Proxy: Send,
     {
         let agent_name = agent_name.to_owned();
         debug!("Spawning agent: {}", agent_name);
@@ -66,7 +66,7 @@ impl TextChat {
                 debug!("Agent {} taking turn..", agent_name);
                 let (agent_proxy_tx, agent_proxy_rx) = agent.take_turn(chat_history).split();
 
-                // receive messages from agent
+                // receive messages from agent, create channel between 2 entities??
 
                 _ = turn_done_tx.send(());
             }
@@ -75,11 +75,11 @@ impl TextChat {
         tokio::spawn(turn_task);
     }
 
-    async fn run_chat<S>(self, mut scheduler: S) -> Result<(), error::Error>
+    pub async fn run<S>(self, mut scheduler: S) -> Result<(), error::Error>
     where
         S: Scheduler,
     {
-        let chat_history = Vec::new();
+        let mut chat_history = Vec::new();
 
         let agent_names = self.agents_turn_tx.iter().map(|(name, _)| name.as_str());
 

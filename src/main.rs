@@ -10,15 +10,16 @@ use async_std::io::BufReader;
 
 use agent_traits::AgentProxy;
 use async_std::io::stdin;
+use chat::scheduler::RoundRobinScheduler;
+use user_agent::UserAgent;
 use user_agent::UserAgentProxy;
 
 use chat::ChatMessage as Message;
 
 use chat::TextChat;
 
-use futures::StreamExt;
-
-fn main() {
+#[tokio::main]
+async fn main() {
     tracing::subscriber::set_global_default(
         tracing_subscriber::FmtSubscriber::builder()
             .with_env_filter(tracing_subscriber::EnvFilter::from_default_env())
@@ -26,8 +27,11 @@ fn main() {
     )
     .unwrap();
 
-    let mut lines_stream = BufReader::new(stdin()).lines();
+    let user_agent = UserAgent;
 
+    let mut chat = TextChat::default();
 
-    let chat = TextChat::default();
+    chat.spawn_agent("user1".to_string(), user_agent);
+
+    chat.run(RoundRobinScheduler::default()).await.unwrap();
 }
