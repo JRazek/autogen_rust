@@ -13,9 +13,8 @@ mod scheduler;
 
 #[derive(Clone, Debug)]
 pub struct ChatMessage {
-    sender: String,
-    recipient: String,
-    message: MessageContent,
+    pub sender: String,
+    pub message: MessageContent,
 }
 
 #[derive(Clone, Debug)]
@@ -80,7 +79,7 @@ impl TextChat {
     where
         S: Scheduler,
     {
-        let mut chat_history = Vec::new();
+        let chat_history = Vec::new();
 
         let agent_names = self.agents_turn_tx.iter().map(|(name, _)| name.as_str());
 

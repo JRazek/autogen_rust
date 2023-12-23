@@ -1,23 +1,27 @@
 use std::ops::DerefMut;
 use std::pin::Pin;
 
-use futures::{
-    channel::mpsc::{SendError, Sender},
-    Sink, SinkExt, Stream, StreamExt,
-};
+use futures::{Sink, SinkExt, Stream, StreamExt};
 
-use crate::agent_traits::AgentProxy;
+use crate::chat::MessageContent;
+
+use async_std::io::BufReader;
+use async_std::io::{Lines, Stdin};
+
+type StdinLines = Lines<BufReader<Stdin>>;
 
 use super::chat::ChatMessage as Message;
 
-pub struct UserAgentProxy<S> {
-    rx: S,
-    tx: Sender<Message>,
+pub struct UserAgentProxy<T> {
+    rx: StdinLines,
+    tx: T,
 }
+
+impl<T> UserAgentProxy<T> {}
 
 impl<S> Stream for UserAgentProxy<S>
 where
-    S: Stream<Item = Message> + Unpin,
+    for<'a> Pin<&'a mut UserAgentProxy<S>>: DerefMut<Target = Self>,
 {
     type Item = Message;
 
@@ -25,15 +29,22 @@ where
         mut self: std::pin::Pin<&mut Self>,
         cx: &mut std::task::Context<'_>,
     ) -> std::task::Poll<Option<Self::Item>> {
-        self.rx.poll_next_unpin(cx)
+        self.rx.poll_next_unpin(cx).map(|opt| match opt {
+            Some(Ok(line)) => Some(Message {
+                sender: "user".to_string(),
+                message: MessageContent::Text(line),
+            }),
+            _ => None,
+        })
     }
 }
 
 impl<S> Sink<Message> for UserAgentProxy<S>
 where
     for<'a> Pin<&'a mut UserAgentProxy<S>>: DerefMut<Target = Self>,
+    S: Sink<Message> + Unpin,
 {
-    type Error = SendError;
+    type Error = <S as Sink<Message>>::Error;
 
     fn poll_ready(
         mut self: Pin<&mut Self>,

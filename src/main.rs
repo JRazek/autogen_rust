@@ -5,7 +5,11 @@ mod agent_traits;
 mod chat;
 mod user_agent;
 
+use async_std::io::prelude::*;
+use async_std::io::BufReader;
+
 use agent_traits::AgentProxy;
+use async_std::io::stdin;
 use user_agent::UserAgentProxy;
 
 use chat::ChatMessage as Message;
@@ -21,6 +25,9 @@ fn main() {
             .finish(),
     )
     .unwrap();
+
+    let mut lines_stream = BufReader::new(stdin()).lines();
+
 
     let chat = TextChat::default();
 }
