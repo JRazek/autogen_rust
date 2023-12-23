@@ -1,10 +1,13 @@
 use crate::agent_traits::{Agent, AgentProxy};
 
-use futures::channel::mpsc::{channel, Receiver, Sender};
+use futures::channel::mpsc as futures_mpsc;
+
+use futures::channel::oneshot as futures_oneshot;
 
 use tracing::error;
 use tracing::{debug, info, trace};
 
+mod channel;
 mod error;
 mod scheduler;
 
@@ -22,20 +25,17 @@ pub enum MessageContent {
 
 type ChatHistory = Vec<ChatMessage>;
 
+type TurnDoneSender = futures_oneshot::Sender<()>;
+type TurnDoneReceiver = futures_oneshot::Receiver<()>;
+
 pub struct TextChat {
-    agents_turn_tx: Vec<(String, Sender<ChatHistory>)>,
-    turn_done_tx: Sender<()>,
-    turn_done_rx: Receiver<()>,
+    agents_turn_tx: Vec<(String, futures_mpsc::Sender<(TurnDoneSender, ChatHistory)>)>,
 }
 
 impl Default for TextChat {
     fn default() -> Self {
-        let (turn_done_tx, turn_done_rx) = channel(1);
-
         Self {
             agents_turn_tx: Vec::new(),
-            turn_done_tx,
-            turn_done_rx,
         }
     }
 }
@@ -54,24 +54,22 @@ impl TextChat {
         let agent_name = agent_name.to_owned();
         debug!("Spawning agent: {}", agent_name);
 
-        let (turn_tx, turn_rx) = channel(1);
+        let (turn_tx, turn_rx) = futures_mpsc::channel(1);
 
         self.agents_turn_tx.push((agent_name.clone(), turn_tx));
 
-        let turn_done_tx = self.turn_done_tx.clone();
-        let turn_task = turn_rx.for_each(move |chat_history| {
+        let turn_task = turn_rx.for_each(move |(turn_done_tx, chat_history)| {
             let agent = agent.clone();
 
-            let mut turn_done_tx = turn_done_tx.clone();
             let agent_name = agent_name.clone();
 
             async move {
                 debug!("Agent {} taking turn..", agent_name);
                 let (agent_proxy_tx, agent_proxy_rx) = agent.take_turn(chat_history).split();
 
-                _ = turn_done_tx.send(()).await.inspect_err(|e| {
-                    error!("Error sending turn done: {}", e);
-                });
+                // receive messages from agent
+
+                _ = turn_done_tx.send(());
             }
         });
 
@@ -91,14 +89,26 @@ impl TextChat {
                 Some((agent_name, tx)) => {
                     let mut tx = tx.clone();
 
-                    if let Err(e) = tx.send(chat_history.clone()).await {
-                        error!("Error sending chat history: {}", e);
-                        return Err(error::Error::AgentTurnTxSendError(agent_name.clone()));
-                    }
+                    let (turn_done_tx, turn_done_rx) = futures_oneshot::channel();
+                    tx.send((turn_done_tx, chat_history.clone()))
+                        .await
+                        .map_err(|_| error::Error::AgentTurnTxSendError(agent_name.clone()))
+                        .inspect_err(|e| {
+                            error!("Error sending chat history: {}", e);
+                        })?;
+
+                    turn_done_rx
+                        .await
+                        .map_err(|_| error::Error::AgentTurnDoneRxRecvError(agent_name.clone()))
+                        .inspect_err(|e| {
+                            error!("Error receiving turn done: {}", e);
+                        })?;
+
+                    //TODO update chat history here
                 }
                 None => {
                     error!("Invalid agent index: {}", idx);
-                    return Err(error::Error::SchedulerInvalidBounds(idx));
+                    Err(error::Error::SchedulerInvalidBounds(idx))?;
                 }
             }
         }
