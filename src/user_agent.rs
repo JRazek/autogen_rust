@@ -18,32 +18,31 @@ use super::chat::ChatMessage;
 pub struct UserAgent;
 
 impl Agent<ChatMessage> for UserAgent {
-    type Proxy = UserAgentProxy;
+    type ProxyStream = UserAgentProxyStream;
+    type ProxySink = UserAgentProxySink;
 
-    fn take_turn(&self, chat_history: impl IntoIterator<Item = ChatMessage>) -> Self::Proxy {
+    fn take_turn(&self, _chat_history: impl IntoIterator<Item = ChatMessage>) -> Self::ProxyStream {
         use async_std::io::prelude::BufReadExt;
 
         let mut lines_stream = BufReader::new(stdin()).lines();
 
-        let (tx, rx) = futures::channel::mpsc::channel(1);
+        UserAgentProxyStream { rx: lines_stream }
+    }
 
-        tokio::spawn(rx.for_each(|msg| async move {
-            println!("UserAgentProxy received message: {:?}", msg);
-        }));
-
-        UserAgentProxy {
-            rx: lines_stream,
-            tx,
-        }
+    fn receive_turn(&self, chat_history: impl IntoIterator<Item = ChatMessage>) -> Self::ProxySink {
+        todo!()
     }
 }
 
-pub struct UserAgentProxy {
+pub struct UserAgentProxyStream {
     rx: StdinLines,
+}
+
+pub struct UserAgentProxySink {
     tx: Sender<ChatMessage>,
 }
 
-impl Stream for UserAgentProxy {
+impl Stream for UserAgentProxyStream {
     type Item = ChatMessage;
 
     fn poll_next(
@@ -60,9 +59,7 @@ impl Stream for UserAgentProxy {
     }
 }
 
-impl Sink<ChatMessage> for UserAgentProxy
-where
-    for<'a> Pin<&'a mut UserAgentProxy>: DerefMut<Target = Self>,
+impl Sink<ChatMessage> for UserAgentProxySink
 {
     type Error = SendError;
 

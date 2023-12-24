@@ -1,4 +1,4 @@
-use crate::agent_traits::{Agent, AgentProxy};
+use crate::agent_traits::{Agent, AgentProxySink};
 
 use futures::channel::mpsc as futures_mpsc;
 
@@ -48,7 +48,7 @@ impl TextChat {
     pub fn spawn_agent<A>(&mut self, agent_name: impl ToOwned<Owned = String>, agent: A)
     where
         A: Agent<ChatMessage> + Send + Clone + 'static,
-        <A as Agent<ChatMessage>>::Proxy: Send,
+        <A as Agent<ChatMessage>>::ProxySink: Send,
     {
         let agent_name = agent_name.to_owned();
         debug!("Spawning agent: {}", agent_name);
@@ -64,7 +64,7 @@ impl TextChat {
 
             async move {
                 debug!("Agent {} taking turn..", agent_name);
-                let (agent_proxy_tx, agent_proxy_rx) = agent.take_turn(chat_history).split();
+                let agent_proxy_stream = agent.take_turn(chat_history);
 
                 // receive messages from agent, create channel between 2 entities??
 

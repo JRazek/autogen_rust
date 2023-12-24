@@ -8,11 +8,11 @@ mod user_agent;
 use async_std::io::prelude::*;
 use async_std::io::BufReader;
 
-use agent_traits::AgentProxy;
+use agent_traits::AgentProxySink;
 use async_std::io::stdin;
 use chat::scheduler::RoundRobinScheduler;
 use user_agent::UserAgent;
-use user_agent::UserAgentProxy;
+use user_agent::UserAgentProxyStream;
 
 use chat::ChatMessage as Message;
 
