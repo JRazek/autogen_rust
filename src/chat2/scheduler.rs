@@ -32,7 +32,7 @@ impl Scheduler for RoundRobin {
         self.current_agent += 1;
 
         match self.max_rounds {
-            Some(max_rounds) if self.current_agent >= max_rounds => None,
+            Some(max_rounds) if self.current_agent > max_rounds => None,
             _ => Some(next_agent),
         }
     }
