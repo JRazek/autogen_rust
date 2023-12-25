@@ -1,5 +1,3 @@
-use super::ChatHistory;
-
 pub trait Scheduler {
     /// Returns the index of the next agent to take a turn.
     fn next_agent(&mut self, agents_count: usize) -> Option<usize>;

@@ -5,18 +5,19 @@ mod agent_traits;
 mod chat;
 mod user_agent;
 
+mod agent_traits2;
+mod chat2;
+
 use async_std::io::prelude::*;
 use async_std::io::BufReader;
 
 use agent_traits::AgentProxySink;
 use async_std::io::stdin;
-use chat::scheduler::RoundRobinScheduler;
 use user_agent::UserAgent;
 use user_agent::UserAgentProxyStream;
 
-use chat::ChatMessage as Message;
-
-use chat::TextChat;
+use chat2::scheduler::RoundRobinScheduler;
+use chat2::Chat;
 
 #[tokio::main]
 async fn main() {
@@ -29,9 +30,9 @@ async fn main() {
 
     let user_agent = UserAgent;
 
-    let mut chat = TextChat::default();
+    let chat: Chat<String> = Chat::new(RoundRobinScheduler::default()).await;
 
-    chat.spawn_agent("user1".to_string(), user_agent);
-
-    chat.run(RoundRobinScheduler::default()).await.unwrap();
+    //    chat.spawn_agent("user1".to_string(), user_agent);
+    //
+    //    chat.run(RoundRobinScheduler::default()).await.unwrap();
 }
