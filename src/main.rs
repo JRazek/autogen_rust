@@ -1,21 +1,13 @@
 #![feature(trait_alias)]
 #![feature(result_option_inspect)]
 
-mod agent_traits;
 mod chat;
 mod user_agent;
 
-mod agent_traits2;
-mod chat2;
-
-use async_std::io::prelude::*;
-use async_std::io::BufReader;
-
-use agent_traits::AgentProxySink;
-use async_std::io::stdin;
+mod agent_traits;
+use chat::scheduler::RoundRobin;
+use chat::Chat;
 use user_agent::UserAgent;
-use chat2::scheduler::RoundRobin;
-use chat2::Chat;
 
 #[tokio::main]
 async fn main() {

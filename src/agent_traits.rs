@@ -1,14 +1,9 @@
 use futures::{Sink, Stream};
 
-//not equivalent to python autogen UserProxyAgent
-//this just provides a facade to an agent
+use async_trait::async_trait;
 
-pub trait AgentProxyStream<Message>: Stream<Item = Message> {}
-
-pub trait AgentProxySink<Message>: Sink<Message> {}
-
-impl<Message, S> AgentProxySink<Message> for S where S: Sink<Message> {}
-
-impl<Message, S> AgentProxyStream<Message> for S where S: Stream<Item = Message> {}
-
-pub trait Agent<Message>: AgentProxySink<Message> + AgentProxyStream<Message> {}
+#[async_trait]
+pub trait Agent<M> {
+    async fn receive(&mut self, stream: impl Stream<Item = M> + Unpin + Send);
+    async fn send(&mut self, sink: impl Sink<M> + Unpin + Send);
+}
