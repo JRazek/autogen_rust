@@ -4,6 +4,9 @@ use async_trait::async_trait;
 
 #[async_trait]
 pub trait Agent<M> {
-    async fn receive(&mut self, stream: impl Stream<Item = M>);
-    async fn send(&mut self, sink: impl Sink<M>);
+    type AgentProxyStream: Stream<Item = M>;
+    type AgentProxySink: Sink<M>;
+
+    fn sink(&mut self) -> Self::AgentProxySink;
+    fn stream(&mut self) -> Self::AgentProxyStream;
 }
