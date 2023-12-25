@@ -1,7 +1,5 @@
-use std::fmt::Debug;
-
 use crate::agent_traits2::Agent;
-use futures::{channel::mpsc as futures_mpsc, Sink};
+use futures::channel::mpsc as futures_mpsc;
 use tokio::sync::broadcast;
 
 use futures::{SinkExt, StreamExt};
@@ -107,10 +105,6 @@ where
     pub async fn add_agent<A>(&mut self, mut agent: A)
     where
         A: Agent<M> + Send + 'static,
-        <A as Agent<M>>::AgentProxySink: Send + Unpin + 'static,
-        <A as Agent<M>>::AgentProxyStream: Send + Unpin + 'static,
-        <<A as Agent<M>>::AgentProxySink as Sink<M>>::Error: Debug,
-        broadcast::error::SendError<M>: Debug,
     {
         self.new_agent_tx.send(()).await.expect("Chat task died");
 
@@ -126,22 +120,28 @@ where
                     Ordering::Receive(mut rx) => {
                         debug!("Receiving from agent");
 
-                        let mut agent_sink = agent.sink();
-                        tokio::spawn(async move {
-                            while let Ok(msg) = rx.recv().await {
-                                agent_sink.send(msg).await.expect("Agent task died");
+                        let stream = futures::stream::poll_fn(move |_| match rx.try_recv() {
+                            Ok(msg) => std::task::Poll::Ready(Some(msg)),
+                            Err(broadcast::error::TryRecvError::Closed) => {
+                                std::task::Poll::Ready(None)
                             }
+                            Err(_) => std::task::Poll::Pending,
                         });
+
+                        agent.receive(stream).await;
                     }
                     Ordering::Send(tx) => {
                         debug!("Sending to agent");
 
-                        let mut agent_stream = agent.stream();
+                        let (futures_tx, mut futures_rx) = futures_mpsc::channel(1);
+
                         tokio::spawn(async move {
-                            while let Some(msg) = agent_stream.next().await {
-                                tx.send(msg).expect("Chat task died");
+                            while let Some(msg) = futures_rx.next().await {
+                                tx.send(msg);
                             }
                         });
+
+                        agent.send(futures_tx).await;
                     }
                 }
             }
