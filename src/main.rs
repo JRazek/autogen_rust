@@ -1,8 +1,8 @@
 #![feature(trait_alias)]
 #![feature(result_option_inspect)]
 
-mod group_chat;
 mod chat;
+mod group_chat;
 mod user_agent;
 mod user_proxy_agent_executor;
 
@@ -24,7 +24,5 @@ async fn main() {
 
     let chat: GroupChat<String> = GroupChat::new(RoundRobin::default()).await;
 
-    //    chat.spawn_agent("user1".to_string(), user_agent);
-    //
     //    chat.run(RoundRobinScheduler::default()).await.unwrap();
 }
