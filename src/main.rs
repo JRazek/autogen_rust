@@ -14,9 +14,7 @@ use async_std::io::BufReader;
 use agent_traits::AgentProxySink;
 use async_std::io::stdin;
 use user_agent::UserAgent;
-use user_agent::UserAgentProxyStream;
-
-use chat2::scheduler::RoundRobinScheduler;
+use chat2::scheduler::RoundRobin;
 use chat2::Chat;
 
 #[tokio::main]
@@ -30,7 +28,7 @@ async fn main() {
 
     let user_agent = UserAgent;
 
-    let chat: Chat<String> = Chat::new(RoundRobinScheduler::default()).await;
+    let chat: Chat<String> = Chat::new(RoundRobin::default()).await;
 
     //    chat.spawn_agent("user1".to_string(), user_agent);
     //
