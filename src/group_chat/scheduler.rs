@@ -1,5 +1,6 @@
 pub trait Scheduler {
     /// Returns the index of the next agent to take a turn.
+    /// None if the chat is over.
     fn next_agent(&mut self, agents_count: usize) -> Option<usize>;
 }
 

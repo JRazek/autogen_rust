@@ -2,7 +2,9 @@
 #![feature(result_option_inspect)]
 
 mod group_chat;
+mod chat;
 mod user_agent;
+mod user_proxy_agent_executor;
 
 mod agent_traits;
 use group_chat::scheduler::RoundRobin;

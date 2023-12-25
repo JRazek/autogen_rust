@@ -122,7 +122,7 @@ where
 
     pub async fn add_agent<A>(&mut self, mut agent: A)
     where
-        A: Agent<M> + Send + 'static,
+        A: Agent<M, M> + Send + 'static,
     {
         self.new_agent_tx.send(()).await.expect("Chat task died");
 
@@ -215,7 +215,7 @@ mod tests {
     }
 
     #[async_trait]
-    impl Agent<&'static str> for TestAgent {
+    impl Agent<&'static str, &'static str> for TestAgent {
         async fn receive(&mut self, mut stream: impl Stream<Item = &'static str> + Unpin + Send) {
             debug!("Agent receive started receiving");
             if let Some(msg) = stream.next().await {
