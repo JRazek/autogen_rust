@@ -1,12 +1,12 @@
 #![feature(trait_alias)]
 #![feature(result_option_inspect)]
 
-mod chat;
+mod group_chat;
 mod user_agent;
 
 mod agent_traits;
-use chat::scheduler::RoundRobin;
-use chat::Chat;
+use group_chat::scheduler::RoundRobin;
+use group_chat::GroupChat;
 use user_agent::UserAgent;
 
 #[tokio::main]
@@ -20,7 +20,7 @@ async fn main() {
 
     let user_agent = UserAgent;
 
-    let chat: Chat<String> = Chat::new(RoundRobin::default()).await;
+    let chat: GroupChat<String> = GroupChat::new(RoundRobin::default()).await;
 
     //    chat.spawn_agent("user1".to_string(), user_agent);
     //

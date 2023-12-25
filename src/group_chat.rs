@@ -8,8 +8,6 @@ use tokio::sync::{broadcast, Barrier};
 
 use futures::{SinkExt, StreamExt};
 
-mod ordering_channel;
-
 pub mod scheduler;
 
 use tokio_util::sync::CancellationToken;
@@ -17,7 +15,7 @@ use tracing::debug;
 
 use self::scheduler::Scheduler;
 
-pub struct Chat<M>
+pub struct GroupChat<M>
 where
     M: Clone + Send + 'static,
 {
@@ -35,11 +33,11 @@ where
     Send(broadcast::Sender<M>, Arc<Barrier>),
 }
 
-impl<M> Chat<M>
+impl<M> GroupChat<M>
 where
     M: Clone + Send + 'static,
 {
-    pub async fn new<S>(mut scheduler: S) -> Chat<M>
+    pub async fn new<S>(mut scheduler: S) -> GroupChat<M>
     where
         S: Scheduler + Send + 'static,
     {
@@ -115,7 +113,7 @@ where
             chat_task_dealine.cancel();
         });
 
-        Chat {
+        GroupChat {
             new_agent_tx,
             new_agent_ack_rx,
             chat_task_dealine: chat_task_dealine_child,
@@ -257,7 +255,7 @@ mod tests {
         )
         .unwrap();
 
-        let mut chat = Chat::new(scheduler::RoundRobin::with_max_rounds(3)).await;
+        let mut chat = GroupChat::new(scheduler::RoundRobin::with_max_rounds(3)).await;
 
         let (task_done_tx, task_done_rx) = futures_mpsc::channel(10);
 
