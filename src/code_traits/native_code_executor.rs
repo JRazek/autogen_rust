@@ -5,12 +5,10 @@ use super::{CodeBlock, Language, UserCodeExecutor};
 
 pub struct NativeCodeExecutor;
 
-use pyo3::prelude::*;
-
 #[async_trait]
 impl UserCodeExecutor for NativeCodeExecutor {
     type CodeBlock = CodeBlock;
-    type Response = PyResult<()>;
+    type Response = Result<(), ()>;
 
     async fn execute_code_block(&self, code_block: Self::CodeBlock) -> Self::Response {
         match code_block.language {
