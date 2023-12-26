@@ -5,22 +5,32 @@ use futures::{Sink, Stream, StreamExt};
 
 use super::code_traits::{CodeExtractor, UserCodeExecutor};
 
-pub struct UserProxyAgentExecutor<E, C>
-where
-    E: UserCodeExecutor<CodeBlock = C>,
-{
-    executor: E,
-    code_blocks: Vec<C>,
+pub struct CodeBlock {
+    language: String,
+    code: String,
 }
 
-impl<Executor, Mtx, C> UserProxyAgentExecutor<Executor, C>
+pub struct UserProxyAgentExecutor<E>
 where
-    Executor: UserCodeExecutor<CodeBlock = C, Response = Mtx> + Send + Sync,
-    Mtx: Send,
-    C: Send + 'static,
+    E: UserCodeExecutor<CodeBlock = CodeBlock>,
+{
+    executor: E,
+    code_blocks: Vec<CodeBlock>,
+}
+
+pub enum ExecutionResponse {
+    Success,
+    Error(String),
+}
+
+impl<Executor> UserProxyAgentExecutor<Executor>
+where
+    Executor: UserCodeExecutor<CodeBlock = CodeBlock, Response = ExecutionResponse> + Send + Sync,
     <Executor as UserCodeExecutor>::Response: Send,
 {
-    pub fn run_code(&mut self) -> impl Stream<Item = Mtx> + Send + '_ {
+    /// User may choose what to do with an ExecutionResponse.
+    /// e.g. when error is encountered, user may abort the execution of futher code blocks.
+    pub fn run_code(&mut self) -> impl Stream<Item = ExecutionResponse> + Send + '_ {
         let stream2 = futures::stream::iter(self.code_blocks.drain(..)).then(|code_block| async {
             let mtx = self.executor.execute_code_block(code_block).await;
             mtx
@@ -30,22 +40,32 @@ where
     }
 }
 
+pub enum UserProxyAgentExecutorError {
+    SendError,
+}
+
 #[async_trait]
-impl<Executor, Mtx, C> Agent<C, Mtx> for UserProxyAgentExecutor<Executor, C>
+impl<Executor> Agent<CodeBlock, ExecutionResponse> for UserProxyAgentExecutor<Executor>
 where
-    Executor: UserCodeExecutor<CodeBlock = C, Response = Mtx> + Send + Sync,
-    Mtx: Send,
-    C: Send + 'static,
+    Executor: UserCodeExecutor<CodeBlock = CodeBlock, Response = ExecutionResponse> + Send + Sync,
     <Executor as UserCodeExecutor>::Response: Send,
 {
-    async fn receive(&mut self, stream: impl Stream<Item = C> + Unpin + Send) {
+    type Error = UserProxyAgentExecutorError;
+    async fn receive(&mut self, stream: impl Stream<Item = CodeBlock> + Unpin + Send) {
         let blocks = stream.collect::<Vec<_>>().await;
 
         self.code_blocks.extend(blocks);
     }
 
-    async fn send(&mut self, sink: impl Sink<Mtx> + Unpin + Send) {
+    async fn send(
+        &mut self,
+        sink: impl Sink<ExecutionResponse> + Unpin + Send,
+    ) -> Result<(), Self::Error> {
         let stream = self.run_code();
-        stream.map(Ok).forward(sink).await;
+        stream
+            .map(Ok)
+            .forward(sink)
+            .await
+            .map_err(|_| UserProxyAgentExecutorError::SendError)
     }
 }

@@ -12,3 +12,15 @@ pub trait UserCodeExecutor {
 
     async fn execute_code_block(&self, code_block: Self::CodeBlock) -> Self::Response;
 }
+
+pub struct FencedCodeBlockExtractor;
+
+impl CodeExtractor<String> for FencedCodeBlockExtractor {
+    type CodeBlock = String;
+
+    fn extract_code_blocks(&self, messages: impl Iterator<Item = String>) -> Vec<Self::CodeBlock> {
+        let string = messages.collect::<Vec<_>>().join("");
+
+        todo!()
+    }
+}

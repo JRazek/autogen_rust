@@ -1,26 +1,20 @@
 #![allow(dead_code)]
 
-use crate::user_proxy_agent_executor::UserProxyAgentExecutor;
+use crate::user_proxy_agent_executor::{CodeBlock, UserProxyAgentExecutor};
 
 use super::code_traits::{CodeExtractor, UserCodeExecutor};
 
-pub enum ExecutionResponse {
-    
-}
-
 /// UserAgent is a struct that represents a user of the system which can run code.
 #[derive(Clone)]
-pub struct UserAgent<M> {
-    _m: std::marker::PhantomData<M>,
-}
+pub struct UserAgent {}
 
-impl<M> UserAgent<M> {
-    fn with_user_proxy<Extractor, Executor, C>(
-        _user_proxy_agent_executor: UserProxyAgentExecutor<Executor, C>,
+impl UserAgent {
+    fn with_user_proxy<Extractor, Executor>(
+        _user_proxy_agent_executor: UserProxyAgentExecutor<Executor>,
     ) -> Self
     where
-        Extractor: CodeExtractor<M, CodeBlock = M>,
-        Executor: UserCodeExecutor<CodeBlock = C, Response = M>,
+        Extractor: CodeExtractor<String, CodeBlock = CodeBlock>,
+        Executor: UserCodeExecutor<CodeBlock = CodeBlock, Response = CodeBlock>,
     {
         todo!()
     }
