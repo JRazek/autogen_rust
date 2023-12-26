@@ -5,10 +5,7 @@ use futures::{Sink, Stream, StreamExt};
 
 use super::code_traits::{CodeExtractor, UserCodeExecutor};
 
-pub struct CodeBlock {
-    language: String,
-    code: String,
-}
+use super::code_traits::CodeBlock;
 
 pub struct UserProxyAgentExecutor<E>
 where

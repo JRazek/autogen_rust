@@ -216,6 +216,8 @@ mod tests {
 
     #[async_trait]
     impl Agent<&'static str, &'static str> for TestAgent {
+        type Error = ();
+
         async fn receive(&mut self, mut stream: impl Stream<Item = &'static str> + Unpin + Send) {
             debug!("Agent receive started receiving");
             if let Some(msg) = stream.next().await {
@@ -234,7 +236,10 @@ mod tests {
             debug!("Agent receive finished receiving");
         }
 
-        async fn send(&mut self, mut sink: impl Sink<&'static str> + Unpin + Send) {
+        async fn send(
+            &mut self,
+            mut sink: impl Sink<&'static str> + Unpin + Send,
+        ) -> Result<(), ()> {
             for msg in self.to_send.drain(..) {
                 debug!("Sending message: {}", msg);
                 if let Err(_) = sink.send(msg).await {
@@ -243,6 +248,8 @@ mod tests {
             }
 
             debug!("Agent send finished sending");
+
+            Ok(())
         }
     }
 
