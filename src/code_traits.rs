@@ -10,7 +10,7 @@ pub use native_code_executor::*;
 
 pub trait CodeExtractor<M> {
     type CodeBlock;
-    fn extract_code_blocks(&self, messages: impl Iterator<Item = M>) -> Vec<Self::CodeBlock>;
+    fn extract_code_blocks(&self, _: M) -> Vec<Self::CodeBlock>;
 }
 
 #[async_trait]

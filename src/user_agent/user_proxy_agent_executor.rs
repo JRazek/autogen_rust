@@ -7,6 +7,8 @@ use crate::code_traits::UserCodeExecutor;
 
 use crate::code_traits::CodeBlock;
 
+use super::UserAgent;
+
 pub struct UserProxyAgentExecutor<E>
 where
     E: UserCodeExecutor<CodeBlock = CodeBlock>,
@@ -53,28 +55,29 @@ pub enum UserProxyAgentExecutorError {
     SendError,
 }
 
+pub enum Message {
+    Text(String),
+}
+
+use crate::code_traits::CodeExtractor;
+
 #[async_trait]
-impl<Executor> Agent<CodeBlock, ExecutionResponse> for UserProxyAgentExecutor<Executor>
+impl<Executor, Extractor> Agent<Message, ExecutionResponse>
+    for (UserAgent, Extractor, UserProxyAgentExecutor<Executor>)
 where
     Executor: UserCodeExecutor<CodeBlock = CodeBlock, Response = ExecutionResponse> + Send + Sync,
+    Extractor: CodeExtractor<Message, CodeBlock = CodeBlock> + Send,
     <Executor as UserCodeExecutor>::Response: Send,
 {
     type Error = UserProxyAgentExecutorError;
-    async fn receive(&mut self, stream: impl Stream<Item = CodeBlock> + Unpin + Send) {
-        let blocks = stream.collect::<Vec<_>>().await;
-
-        self.code_blocks.extend(blocks);
+    async fn receive(&mut self, stream: impl Stream<Item = Message> + Unpin + Send) {
+        let (user_agent, extractor, user_proxy_agent_executor) = self;
     }
 
     async fn send(
         &mut self,
         sink: impl Sink<ExecutionResponse> + Unpin + Send,
     ) -> Result<(), Self::Error> {
-        let stream = self.run_code();
-        stream
-            .map(Ok)
-            .forward(sink)
-            .await
-            .map_err(|_| UserProxyAgentExecutorError::SendError)
+        todo!()
     }
 }

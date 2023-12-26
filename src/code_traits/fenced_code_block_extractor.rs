@@ -32,11 +32,8 @@ pub struct FencedCodeBlockExtractor;
 impl CodeExtractor<String> for FencedCodeBlockExtractor {
     type CodeBlock = CodeBlock;
 
-    fn extract_code_blocks(&self, messages: impl Iterator<Item = String>) -> Vec<Self::CodeBlock> {
-        let string = messages.collect::<Vec<_>>().join("");
-
-        eprintln!("string: {}", string);
-
+    //make it accept stream and a sink. Then it will match code blocks as an async element and send them to the sink
+    fn extract_code_blocks(&self, string: String) -> Vec<Self::CodeBlock> {
         let re = Regex::new(r"```(?P<language>\w+)\n(?s)(?P<code>.+?)\n```").unwrap();
 
         let mut code_blocks = vec![];
@@ -69,7 +66,11 @@ mod tests {
 
         let extractor = FencedCodeBlockExtractor;
 
-        let code_blocks = extractor.extract_code_blocks(messages.into_iter());
+        let code_blocks = messages
+            .iter()
+            .map(|message| extractor.extract_code_blocks(message.to_string()))
+            .flatten()
+            .collect::<Vec<_>>();
 
         assert_eq!(code_blocks.len(), 2);
         assert_eq!(code_blocks[0].language, Language::Rust);
