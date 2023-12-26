@@ -37,17 +37,22 @@ where
 }
 
 #[async_trait]
-impl<Extractor, Executor, Mtx, Mrx, C> Agent<Mtx, Mrx>
-    for UserProxyAgentExecutor<Extractor, Executor, Mtx, C>
+impl<Extractor, Executor, Mrx, Mtx, C> Agent<Mrx, Mtx>
+    for UserProxyAgentExecutor<Extractor, Executor, Mrx, C>
 where
-    Extractor: CodeExtractor<Mtx, CodeBlock = C> + Send,
-    Executor: UserCodeExecutor<CodeBlock = C> + Send,
+    Extractor: CodeExtractor<Mrx, CodeBlock = C> + Send,
+    Executor: UserCodeExecutor<CodeBlock = C, Response = Mtx> + Send + Sync,
     Mtx: Send,
+    Mrx: Send,
+    C: Send + 'static,
+    <Executor as UserCodeExecutor>::Response: Send,
 {
-    async fn receive(&mut self, stream: impl Stream<Item = Mtx> + Unpin + Send) {
+    async fn receive(&mut self, stream: impl Stream<Item = Mrx> + Unpin + Send) {
         let messages = stream.collect::<Vec<_>>().await;
         self.messages.extend(messages);
     }
 
-    async fn send(&mut self, sink: impl Sink<Mrx> + Unpin + Send) {}
+    async fn send(&mut self, sink: impl Sink<Mtx> + Unpin + Send) {
+        let stream = self.run_code();
+    }
 }

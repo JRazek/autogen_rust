@@ -3,9 +3,9 @@ use futures::{Sink, Stream};
 use async_trait::async_trait;
 
 #[async_trait]
-pub trait Agent<Mtx, Mrx> {
-    async fn receive(&mut self, stream: impl Stream<Item = Mtx> + Unpin + Send);
-    async fn send(&mut self, sink: impl Sink<Mrx> + Unpin + Send);
+pub trait Agent<Mrx, Mtx> {
+    async fn receive(&mut self, stream: impl Stream<Item = Mrx> + Unpin + Send);
+    async fn send(&mut self, sink: impl Sink<Mtx> + Unpin + Send);
 }
 
 pub trait CodeExtractor<M> {
@@ -20,8 +20,3 @@ pub trait UserCodeExecutor {
 
     async fn execute_code_block(&self, code_block: Self::CodeBlock) -> Self::Response;
 }
-
-//#[async_trait]
-//pub trait UserAgent<M>: Agent<M> {
-//    type UserProxyAgent: Agent<M>;
-//}

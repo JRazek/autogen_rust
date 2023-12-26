@@ -20,7 +20,7 @@ async fn main() {
     )
     .unwrap();
 
-    let user_agent = UserAgent;
+//    let user_agent = UserAgent;
 
     let chat: GroupChat<String> = GroupChat::new(RoundRobin::default()).await;
 
