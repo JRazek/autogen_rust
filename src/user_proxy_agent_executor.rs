@@ -5,29 +5,23 @@ use super::agent_traits::{CodeExtractor, UserCodeExecutor};
 use async_trait::async_trait;
 use futures::{Sink, Stream, StreamExt};
 
-pub struct UserProxyAgentExecutor<Extractor, Executor, M, C>
+pub struct UserProxyAgentExecutor<Executor, C>
 where
-    Extractor: CodeExtractor<M, CodeBlock = C>,
     Executor: UserCodeExecutor<CodeBlock = C>,
 {
-    extractor: Extractor,
     executor: Executor,
-    messages: Vec<M>,
+    code_blocks: Vec<C>,
 }
 
-impl<Extractor, Executor, Mrx, Mtx, C> UserProxyAgentExecutor<Extractor, Executor, Mrx, C>
+impl<Executor, Mtx, C> UserProxyAgentExecutor<Executor, C>
 where
-    Extractor: CodeExtractor<Mrx, CodeBlock = C> + Send,
     Executor: UserCodeExecutor<CodeBlock = C, Response = Mtx> + Send + Sync,
     Mtx: Send,
-    Mrx: Send,
     C: Send + 'static,
     <Executor as UserCodeExecutor>::Response: Send,
 {
     pub fn run_code(&mut self) -> impl Stream<Item = Mtx> + Send + '_ {
-        let code_blocks = self.extractor.extract_code_blocks(self.messages.drain(..));
-
-        let stream2 = futures::stream::iter(code_blocks).then(|code_block| async {
+        let stream2 = futures::stream::iter(self.code_blocks.drain(..)).then(|code_block| async {
             let mtx = self.executor.execute_code_block(code_block).await;
             mtx
         });
@@ -37,22 +31,22 @@ where
 }
 
 #[async_trait]
-impl<Extractor, Executor, Mrx, Mtx, C> Agent<Mrx, Mtx>
-    for UserProxyAgentExecutor<Extractor, Executor, Mrx, C>
+impl<Executor, Mtx, C> Agent<C, Mtx> for UserProxyAgentExecutor<Executor, C>
 where
-    Extractor: CodeExtractor<Mrx, CodeBlock = C> + Send,
     Executor: UserCodeExecutor<CodeBlock = C, Response = Mtx> + Send + Sync,
     Mtx: Send,
-    Mrx: Send,
     C: Send + 'static,
     <Executor as UserCodeExecutor>::Response: Send,
 {
-    async fn receive(&mut self, stream: impl Stream<Item = Mrx> + Unpin + Send) {
-        let messages = stream.collect::<Vec<_>>().await;
-        self.messages.extend(messages);
+    async fn receive(&mut self, stream: impl Stream<Item = C> + Unpin + Send) {
+        let blocks = stream.collect::<Vec<_>>().await;
+
+        self.code_blocks.extend(blocks);
     }
 
     async fn send(&mut self, sink: impl Sink<Mtx> + Unpin + Send) {
         let stream = self.run_code();
+        stream.map(Ok).forward(sink).await;
     }
 }
+
