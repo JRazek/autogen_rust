@@ -11,6 +11,9 @@ mod agent_traits;
 use group_chat::scheduler::RoundRobin;
 use group_chat::GroupChat;
 
+use code_traits::NativeCodeExecutor;
+use user_proxy_agent_executor::UserProxyAgentExecutor;
+
 #[tokio::main]
 async fn main() {
     tracing::subscriber::set_global_default(
@@ -23,6 +26,8 @@ async fn main() {
     //    let user_agent = UserAgent;
 
     let chat: GroupChat<String> = GroupChat::new(RoundRobin::default()).await;
+
+    let user_proxy_agent_executor = UserProxyAgentExecutor::new(NativeCodeExecutor);
 
     //    chat.run(RoundRobinScheduler::default()).await.unwrap();
 }

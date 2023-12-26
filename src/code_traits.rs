@@ -1,8 +1,8 @@
 use async_trait::async_trait;
 
-mod fenced_code_block_extractor;
+pub mod fenced_code_block_extractor;
 
-mod native_code_executor;
+pub mod native_code_executor;
 
 pub use fenced_code_block_extractor::*;
 

@@ -15,6 +15,18 @@ where
     code_blocks: Vec<CodeBlock>,
 }
 
+impl<E> UserProxyAgentExecutor<E>
+where
+    E: UserCodeExecutor<CodeBlock = CodeBlock>,
+{
+    pub fn new(executor: E) -> Self {
+        Self {
+            executor,
+            code_blocks: Vec::new(),
+        }
+    }
+}
+
 pub enum ExecutionResponse {
     Success,
     Error(String),
