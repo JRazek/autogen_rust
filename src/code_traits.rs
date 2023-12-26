@@ -1,8 +1,8 @@
 use async_trait::async_trait;
 
-mod implementation;
+mod fenced_code_block_extractor;
 
-pub use implementation::*;
+pub use fenced_code_block_extractor::*;
 
 pub trait CodeExtractor<M> {
     type CodeBlock;

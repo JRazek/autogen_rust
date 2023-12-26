@@ -15,7 +15,9 @@ impl CodeExtractor<String> for FencedCodeBlockExtractor {
     fn extract_code_blocks(&self, messages: impl Iterator<Item = String>) -> Vec<Self::CodeBlock> {
         let string = messages.collect::<Vec<_>>().join("");
 
-        let re = Regex::new(r"```(?P<language>\w+)\n(?P<code>.+?)\n```").unwrap();
+        eprintln!("string: {}", string);
+
+        let re = Regex::new(r"```(?P<language>\w+)\n(?s)(?P<code>.+?)\n```").unwrap();
 
         let mut code_blocks = vec![];
 
@@ -49,9 +51,9 @@ mod tests {
         assert_eq!(code_blocks[0].language, "rust");
         assert_eq!(
             code_blocks[0].code,
-            "fn main() {\nprintln!(\"Hello, world!\");\n}\n"
+            "fn main() {\nprintln!(\"Hello, world!\");\n}"
         );
         assert_eq!(code_blocks[1].language, "python");
-        assert_eq!(code_blocks[1].code, "print(\"Hello, world!\")\n");
+        assert_eq!(code_blocks[1].code, "print(\"Hello, world!\")");
     }
 }
