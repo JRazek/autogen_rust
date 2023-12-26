@@ -2,7 +2,11 @@ use async_trait::async_trait;
 
 mod fenced_code_block_extractor;
 
+mod native_code_executor;
+
 pub use fenced_code_block_extractor::*;
+
+pub use native_code_executor::*;
 
 pub trait CodeExtractor<M> {
     type CodeBlock;

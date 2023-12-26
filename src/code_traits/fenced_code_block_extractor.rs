@@ -2,9 +2,29 @@ use regex::Regex;
 
 use super::CodeExtractor;
 
+#[non_exhaustive]
+#[derive(Debug, Clone, PartialEq)]
+pub enum Language {
+    Rust,
+    Python,
+}
+
+impl TryInto<Language> for &str {
+    type Error = ();
+
+    fn try_into(self) -> Result<Language, Self::Error> {
+        match self {
+            "rust" => Ok(Language::Rust),
+            "python" => Ok(Language::Python),
+            _ => Err(()),
+        }
+    }
+}
+
+#[derive(Debug, Clone, PartialEq)]
 pub struct CodeBlock {
-    language: String,
-    code: String,
+    pub language: Language,
+    pub code: String,
 }
 
 pub struct FencedCodeBlockExtractor;
@@ -22,10 +42,14 @@ impl CodeExtractor<String> for FencedCodeBlockExtractor {
         let mut code_blocks = vec![];
 
         for cap in re.captures_iter(&string) {
-            let language = cap.name("language").unwrap().as_str().to_string();
-            let code = cap.name("code").unwrap().as_str().to_string();
+            let language = cap.name("language").unwrap().as_str().try_into();
 
-            code_blocks.push(CodeBlock { language, code });
+            if let Ok(language) = language {
+                eprintln!("language: {:?}", language);
+                let code = cap.name("code").unwrap().as_str().to_string();
+
+                code_blocks.push(CodeBlock { language, code });
+            }
         }
 
         code_blocks
@@ -48,12 +72,12 @@ mod tests {
         let code_blocks = extractor.extract_code_blocks(messages.into_iter());
 
         assert_eq!(code_blocks.len(), 2);
-        assert_eq!(code_blocks[0].language, "rust");
+        assert_eq!(code_blocks[0].language, Language::Rust);
         assert_eq!(
             code_blocks[0].code,
             "fn main() {\nprintln!(\"Hello, world!\");\n}"
         );
-        assert_eq!(code_blocks[1].language, "python");
+        assert_eq!(code_blocks[1].language, Language::Python);
         assert_eq!(code_blocks[1].code, "print(\"Hello, world!\")");
     }
 }
