@@ -1,8 +1,10 @@
 #![allow(dead_code)]
 
-use crate::user_proxy_agent_executor::UserProxyAgentExecutor;
-
 use super::code_traits::{CodeBlock, CodeExtractor, UserCodeExecutor};
+
+mod user_proxy_agent_executor;
+
+pub use user_proxy_agent_executor::*;
 
 /// UserAgent is a struct that represents a user of the system which can run code.
 #[derive(Clone)]

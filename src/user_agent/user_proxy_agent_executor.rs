@@ -3,9 +3,9 @@ use crate::agent_traits::Agent;
 use async_trait::async_trait;
 use futures::{Sink, Stream, StreamExt};
 
-use super::code_traits::{CodeExtractor, UserCodeExecutor};
+use crate::code_traits::UserCodeExecutor;
 
-use super::code_traits::CodeBlock;
+use crate::code_traits::CodeBlock;
 
 pub struct UserProxyAgentExecutor<E>
 where

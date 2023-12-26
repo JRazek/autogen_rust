@@ -5,14 +5,13 @@ mod chat;
 mod code_traits;
 mod group_chat;
 mod user_agent;
-mod user_proxy_agent_executor;
 
 mod agent_traits;
 use group_chat::scheduler::RoundRobin;
 use group_chat::GroupChat;
 
 use code_traits::NativeCodeExecutor;
-use user_proxy_agent_executor::UserProxyAgentExecutor;
+use user_agent::UserProxyAgentExecutor;
 
 #[tokio::main]
 async fn main() {
