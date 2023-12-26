@@ -1,15 +1,15 @@
 use crate::agent_traits::Agent;
 
-use super::agent_traits::{CodeExtractor, UserCodeExecutor};
-
 use async_trait::async_trait;
 use futures::{Sink, Stream, StreamExt};
 
-pub struct UserProxyAgentExecutor<Executor, C>
+use super::code_traits::{CodeExtractor, UserCodeExecutor};
+
+pub struct UserProxyAgentExecutor<E, C>
 where
-    Executor: UserCodeExecutor<CodeBlock = C>,
+    E: UserCodeExecutor<CodeBlock = C>,
 {
-    executor: Executor,
+    executor: E,
     code_blocks: Vec<C>,
 }
 
@@ -49,4 +49,3 @@ where
         stream.map(Ok).forward(sink).await;
     }
 }
-

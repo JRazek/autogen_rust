@@ -1,29 +1,22 @@
-use std::pin::Pin;
+#![allow(dead_code)]
 
-use futures::channel::mpsc::{SendError, Sender};
-use futures::{Sink, SinkExt, Stream, StreamExt};
-
-use async_std::io::{prelude::BufReadExt, stdin, BufReader};
-use async_std::io::{Lines, Stdin};
-
-use crate::agent_traits::{CodeExtractor, UserCodeExecutor};
 use crate::user_proxy_agent_executor::UserProxyAgentExecutor;
 
-type StdinLines = Lines<BufReader<Stdin>>;
+use super::code_traits::{CodeExtractor, UserCodeExecutor};
 
 pub enum ExecutionResponse {
-
+    
 }
 
+/// UserAgent is a struct that represents a user of the system which can run code.
 #[derive(Clone)]
 pub struct UserAgent<M> {
     _m: std::marker::PhantomData<M>,
 }
 
-//jak dokladnie wygląda komunikacji w autogenie w przypadku pisania kodu przez llma?
 impl<M> UserAgent<M> {
     fn with_user_proxy<Extractor, Executor, C>(
-        user_proxy_agent_executor: UserProxyAgentExecutor<Executor, C>,
+        _user_proxy_agent_executor: UserProxyAgentExecutor<Executor, C>,
     ) -> Self
     where
         Extractor: CodeExtractor<M, CodeBlock = M>,

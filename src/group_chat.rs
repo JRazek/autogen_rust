@@ -179,7 +179,7 @@ where
     }
 
     //just drop all the channels in Chat and allow the scheduled tasks to leave loop.
-    async fn start(self) {
+    pub async fn start(self) {
         drop(self.new_agent_tx);
         drop(self.new_agent_ack_rx);
 
