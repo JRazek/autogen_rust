@@ -1,6 +1,5 @@
 #![allow(dead_code)]
 
-use crate::agent_traits::Agent;
 use futures::channel::mpsc as futures_mpsc;
 
 use futures::{SinkExt, StreamExt};
@@ -12,7 +11,7 @@ use tracing::{debug, error};
 
 use self::scheduler::Scheduler;
 
-use crate::agent_traits::{ConsumerAgent, RespondingAgent};
+use crate::agent_traits::{ConsumerAgent, ProducerAgent, RespondingAgent};
 
 use futures::channel::oneshot as futures_oneshot;
 
@@ -144,10 +143,11 @@ where
         }
     }
 
-    pub async fn add_agent<A>(&mut self, mut agent: A)
+    pub async fn add_agent<A, E>(&mut self, mut agent: A)
     where
-        A: Agent<M, M> + Send + 'static,
-        <A as Agent<M, M>>::Error: std::error::Error + Send + Sync + 'static,
+        A: ConsumerAgent<M, Error = E> + ProducerAgent<Mtx = M> + Send + 'static,
+        E: error::ErrorT,
+        <A as ProducerAgent>::Error: error::ErrorT,
     {
         self.new_agent_tx.send(()).await.expect("Chat task died");
 
@@ -164,19 +164,23 @@ where
                         debug!("Sending to agent");
 
                         let sender_response: Result<M, GroupChatTaskError> = agent
-                            .reply()
+                            .generate_prompt()
                             .await
                             .map_err(|err| GroupChatTaskError::OtherError(err.into()));
 
                         sender_response_tx.send(sender_response).unwrap();
                     }
+                    //TODO should handle responding agents here as well.
                     Ordering::Receive(messasge, receive_result_tx) => {
                         debug!("Receiving from agent");
 
-                        agent.receive(messasge).await;
+                        let result = agent
+                            .receive(messasge)
+                            .await
+                            .map_err(|err| GroupChatTaskError::OtherError(err.into()));
 
                         //might forward all errors here
-                        receive_result_tx.send(Ok(())).unwrap();
+                        receive_result_tx.send(result).unwrap();
 
                         debug!("Agent receive finished receiving. Waiting on barrier");
                     }
@@ -235,10 +239,10 @@ mod tests {
     }
 
     #[async_trait]
-    impl Agent<&'static str, &'static str> for TestAgent {
+    impl ConsumerAgent<&'static str> for TestAgent {
         type Error = TestError;
 
-        async fn receive(&mut self, msg: &'static str) {
+        async fn receive(&mut self, msg: &'static str) -> Result<(), Self::Error> {
             debug!("Received message: {}", msg);
 
             self.received.push(msg);
@@ -256,9 +260,17 @@ mod tests {
             }
 
             debug!("Agent receive finished receiving");
-        }
 
-        async fn reply(&mut self) -> Result<&'static str, Self::Error> {
+            Ok(())
+        }
+    }
+
+    #[async_trait]
+    impl ProducerAgent for TestAgent {
+        type Mtx = &'static str;
+        type Error = TestError;
+
+        async fn generate_prompt(&mut self) -> Result<&'static str, Self::Error> {
             debug!("Agent send finished sending");
 
             Ok(self.to_send)
