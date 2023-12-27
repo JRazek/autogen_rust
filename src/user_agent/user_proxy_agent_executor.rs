@@ -6,7 +6,7 @@ use crate::code_traits::UserCodeExecutor;
 
 use crate::code_traits::CodeBlock;
 
-use super::UserAgent;
+use super::{RequestCodeFeedback, UserAgent2};
 
 use crate::user_agent::CodeBlockFeedback;
 
@@ -44,9 +44,10 @@ pub enum Message {
 use crate::code_traits::CodeExtractor;
 
 #[async_trait]
-impl<Executor, Extractor> RespondingAgent<Message, ()>
-    for (UserAgent, Extractor, UserProxyAgentExecutor<Executor>)
+impl<UA, Executor, Extractor> RespondingAgent<Message, ()>
+    for (UA, Extractor, UserProxyAgentExecutor<Executor>)
 where
+    UA: UserAgent2<String, String, Error = ()> + Send + Sync,
     Executor: UserCodeExecutor<CodeBlock = CodeBlock, Response = ExecutionResponse> + Send + Sync,
     Extractor: CodeExtractor<Message, CodeBlock = CodeBlock> + Send,
     <Executor as UserCodeExecutor>::Response: Send,
