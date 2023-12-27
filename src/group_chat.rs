@@ -1,17 +1,14 @@
 #![allow(dead_code)]
 
-use std::sync::Arc;
-
 use crate::agent_traits::Agent;
 use futures::channel::mpsc as futures_mpsc;
-use tokio::sync::{broadcast, Barrier};
 
 use futures::{SinkExt, StreamExt};
 
 pub mod scheduler;
 
 use tokio_util::sync::CancellationToken;
-use tracing::{debug, error, info, trace, warn};
+use tracing::{debug, error, trace};
 
 use self::scheduler::Scheduler;
 
@@ -27,15 +24,24 @@ where
     chat_task_dealine: CancellationToken,
 }
 
-pub trait Error: Send + Sync + 'static {}
+pub trait Error: std::error::Error + Send + Sync + 'static {}
 
+impl<E: std::error::Error + Send + Sync + 'static> Error for E {}
+
+impl<E: Error> From<E> for Box<dyn Error> {
+    fn from(err: E) -> Self {
+        Box::new(err)
+    }
+}
+
+#[derive(Debug)]
 struct SendError;
 
 enum Ordering<M>
 where
     M: Send + 'static,
 {
-    Send(futures_oneshot::Sender<Result<Result<M, SendError>, Box<dyn Error>>>),
+    Send(futures_oneshot::Sender<Result<M, Box<dyn Error>>>),
     Receive(M, futures_oneshot::Sender<Result<(), Box<dyn Error>>>),
 }
 
@@ -93,9 +99,7 @@ where
                     .await
                     .unwrap();
 
-                let Ok(sender_response) = sender_response_rx.await.unwrap() else {
-                    panic!("Sender response error");
-                };
+                let sender_response = sender_response_rx.await.unwrap().unwrap();
 
                 use futures::stream::iter as async_iter;
 
@@ -120,19 +124,21 @@ where
                     .collect::<Vec<futures_oneshot::Receiver<_>>>()
                     .await;
 
-                async_iter(receive_responses_rx_vec).for_each(|rx| async move {
-                    debug!("Waiting for receive response");
-                    let receive_response = rx.await.unwrap();
+                async_iter(receive_responses_rx_vec)
+                    .for_each(|rx| async move {
+                        debug!("Waiting for receive response");
+                        let receive_response = rx.await.unwrap();
 
-                    match receive_response {
-                        Ok(()) => {
-                            trace!("received response in receive");
+                        match receive_response {
+                            Ok(()) => {
+                                trace!("received response in receive");
+                            }
+                            Err(err) => {
+                                error!("Error in receive: {}", err);
+                            }
                         }
-                        Err(err) => {
-                            error!("Error in receive");
-                        }
-                    }
-                });
+                    })
+                    .await;
 
                 debug!("Agent round finished");
             }
@@ -151,7 +157,7 @@ where
     pub async fn add_agent<A>(&mut self, mut agent: A)
     where
         A: Agent<M, M> + Send + 'static,
-        <A as Agent<M, M>>::Error: std::error::Error + Send + Sync + 'static + 'static,
+        <A as Agent<M, M>>::Error: std::error::Error + Send + Sync + 'static,
     {
         self.new_agent_tx.send(()).await.expect("Chat task died");
 
@@ -167,10 +173,10 @@ where
                     Ordering::Send(sender_response_tx) => {
                         debug!("Sending to agent");
 
-                        let sender_response: Result<M, SendError> =
-                            agent.send().await.map_err(|_| SendError);
+                        let sender_response: Result<M, Box<dyn Error>> =
+                            agent.send().await.map_err(|err| err.into());
 
-                        if let Err(_) = sender_response_tx.send(Ok(sender_response)) {
+                        if let Err(_) = sender_response_tx.send(sender_response) {
                             panic!("Chat task died");
                         }
                     }
@@ -206,7 +212,7 @@ where
 mod tests {
     use super::*;
 
-    use futures::{Sink, SinkExt, Stream, StreamExt};
+    use futures::{SinkExt, StreamExt};
 
     use async_trait::async_trait;
 
@@ -229,12 +235,25 @@ mod tests {
         }
     }
 
+    use thiserror::Error;
+
+    #[derive(Debug, Error)]
+    struct TestError;
+
+    impl std::fmt::Display for TestError {
+        fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+            write!(f, "")
+        }
+    }
+
     #[async_trait]
     impl Agent<&'static str, &'static str> for TestAgent {
-        type Error = ();
+        type Error = TestError;
 
-        async fn receive(&mut self, mut msg: &'static str) {
+        async fn receive(&mut self, msg: &'static str) {
             debug!("Received message: {}", msg);
+
+            self.received.push(msg);
 
             if self.received.len() == self.expected.len() {
                 assert_eq!(self.received, self.expected);
@@ -244,10 +263,14 @@ mod tests {
                 self.task_done_tx.send(()).await.unwrap();
             }
 
+            if self.received.len() > self.expected.len() {
+                panic!("Received more messages than expected");
+            }
+
             debug!("Agent receive finished receiving");
         }
 
-        async fn send(&mut self) -> Result<&'static str, ()> {
+        async fn send(&mut self) -> Result<&'static str, Self::Error> {
             debug!("Agent send finished sending");
 
             Ok(self.to_send)
