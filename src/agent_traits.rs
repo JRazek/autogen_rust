@@ -17,7 +17,7 @@ pub trait ProducerAgent<Mtx> {
     type Error;
 
     /// Based on the current state of Agent, reply with a message.
-    async fn prompt(&mut self) -> Result<Mtx, Self::Error>;
+    async fn generate_prompt(&mut self) -> Result<Mtx, Self::Error>;
 }
 
 #[async_trait]

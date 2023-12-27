@@ -8,6 +8,7 @@ pub use user_proxy_agent_executor::*;
 
 use async_trait::async_trait;
 
+//make it as a trait
 /// UserAgent is a struct that represents a user of the system which can run code.
 #[derive(Clone)]
 pub struct UserAgent;
@@ -33,17 +34,22 @@ impl UserAgent {
     }
 }
 
-use crate::agent_traits::Agent;
+use crate::agent_traits::{Agent, ConsumerAgent, RespondingAgent};
 
 #[async_trait]
-impl Agent<String, String> for UserAgent {
+impl RespondingAgent<String, String> for UserAgent {
     type Error = ();
 
-    async fn receive(&mut self, _message: String) {
+    async fn receive_and_reply(&mut self, message: String) -> Result<String, Self::Error> {
         todo!()
     }
+}
 
-    async fn reply(&mut self) -> Result<String, Self::Error> {
+#[async_trait]
+impl ConsumerAgent<String> for UserAgent {
+    type Error = ();
+
+    async fn receive(&mut self, message: String) -> Result<(), Self::Error> {
         todo!()
     }
 }

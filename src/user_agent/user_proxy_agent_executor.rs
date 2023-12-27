@@ -1,7 +1,6 @@
-use crate::agent_traits::Agent;
+use crate::agent_traits::{ConsumerAgent, RespondingAgent};
 
 use async_trait::async_trait;
-use futures::{Sink, Stream, StreamExt};
 
 use crate::code_traits::UserCodeExecutor;
 
@@ -10,7 +9,6 @@ use crate::code_traits::CodeBlock;
 use super::UserAgent;
 
 use crate::user_agent::CodeBlockFeedback;
-use futures::stream::iter as async_iter;
 
 pub struct UserProxyAgentExecutor<E>
 where
@@ -28,13 +26,15 @@ where
     }
 }
 
-pub enum ExecutionResponse {
+enum ExecutionResponse {
     Success,
     Error(String),
 }
 
 pub enum UserProxyAgentExecutorError {
     SendError,
+    DeniedExecution(String),
+    ExecutionError(String),
 }
 
 pub enum Message {
@@ -44,7 +44,7 @@ pub enum Message {
 use crate::code_traits::CodeExtractor;
 
 #[async_trait]
-impl<Executor, Extractor> Agent<Message, ExecutionResponse>
+impl<Executor, Extractor> RespondingAgent<Message, ()>
     for (UserAgent, Extractor, UserProxyAgentExecutor<Executor>)
 where
     Executor: UserCodeExecutor<CodeBlock = CodeBlock, Response = ExecutionResponse> + Send + Sync,
@@ -52,7 +52,7 @@ where
     <Executor as UserCodeExecutor>::Response: Send,
 {
     type Error = UserProxyAgentExecutorError;
-    async fn receive(&mut self, message: Message) {
+    async fn receive_and_reply(&mut self, message: Message) -> Result<(), Self::Error> {
         let (user_agent, extractor, user_proxy_agent_executor) = self;
 
         let code_blocks = extractor.extract_code_blocks(message);
@@ -70,21 +70,17 @@ where
                             //send success message
                         }
                         ExecutionResponse::Error(e) => {
-                            user_agent.receive(e).await;
+                            user_agent.receive(e.clone()).await.unwrap();
+                            return Err(UserProxyAgentExecutorError::ExecutionError(e));
                         }
                     }
                 }
                 CodeBlockFeedback::DenyExecution { reason } => {
-                    //TODO inform the sender about the reason
-                    break;
+                    return Err(UserProxyAgentExecutorError::DeniedExecution(reason));
                 }
             }
         }
 
-        //may be optimized to process while receiving. Now just collect all messages first.
-    }
-
-    async fn reply(&mut self) -> Result<ExecutionResponse, Self::Error> {
-        todo!()
+        Ok(())
     }
 }
