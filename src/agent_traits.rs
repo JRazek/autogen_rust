@@ -20,8 +20,9 @@ pub trait ConsumerAgent<Mrx> {
 }
 
 #[async_trait]
-pub trait RespondingAgent<Mrx, Mtx> {
+pub trait RespondingAgent<Mrx> {
+    type Mtx;
     type Error;
 
-    async fn receive_and_reply(&mut self, mrx: Mrx) -> Result<Mtx, Self::Error>;
+    async fn receive_and_reply(&mut self, mrx: Mrx) -> Result<Self::Mtx, Self::Error>;
 }

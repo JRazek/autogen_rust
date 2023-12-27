@@ -44,7 +44,7 @@ pub enum Message {
 use crate::code_traits::CodeExtractor;
 
 #[async_trait]
-impl<UA, Executor, Extractor> RespondingAgent<Message, ()>
+impl<UA, Executor, Extractor> RespondingAgent<Message>
     for (UA, Extractor, UserProxyAgentExecutor<Executor>)
 where
     UA: UserAgent<String, Mtx = String, Error = ()> + Send + Sync,
@@ -52,6 +52,7 @@ where
     Extractor: CodeExtractor<Message, CodeBlock = CodeBlock> + Send,
     <Executor as UserCodeExecutor>::Response: Send,
 {
+    type Mtx = ();
     type Error = UserProxyAgentExecutorError;
     async fn receive_and_reply(&mut self, message: Message) -> Result<(), Self::Error> {
         let (user_agent, extractor, user_proxy_agent_executor) = self;

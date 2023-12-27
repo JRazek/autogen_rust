@@ -11,10 +11,11 @@ use async_trait::async_trait;
 
 use crate::agent_traits::{ConsumerAgent, RespondingAgent};
 
+//TODO - delete, replace group chat with Consumer/Responding Agents
 #[async_trait]
 pub trait UserAgent<Mrx> {
-    type Error;
     type Mtx;
+    type Error;
 
     async fn send_to_user(&mut self, message: Mrx) -> Result<(), Self::Error>;
     async fn receive_from_user(&mut self) -> Result<Self::Mtx, Self::Error>;
@@ -35,12 +36,13 @@ pub trait RequestCodeFeedback {
 }
 
 #[async_trait]
-impl<A, Mrx, Mtx> RespondingAgent<Mrx, Mtx> for A
+impl<A, Mrx, Mtx> RespondingAgent<Mrx> for A
 where
     A: UserAgent<Mrx, Mtx = Mtx> + Send + Sync,
     Mrx: Send + 'static,
     Mtx: Send,
 {
+    type Mtx = Mtx;
     type Error = A::Error;
 
     async fn receive_and_reply(&mut self, message: Mrx) -> Result<Mtx, Self::Error> {
