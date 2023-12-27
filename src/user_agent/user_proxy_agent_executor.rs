@@ -59,7 +59,10 @@ where
         let code_blocks = extractor.extract_code_blocks(message);
 
         for code_block in code_blocks {
-            let feedback = user_agent.request_code_block_feedback(&code_block).await;
+            let feedback = user_agent
+                .request_code_block_feedback(&code_block)
+                .await
+                .unwrap();
             match feedback {
                 CodeBlockFeedback::AllowExecution => {
                     let execution_response = user_proxy_agent_executor

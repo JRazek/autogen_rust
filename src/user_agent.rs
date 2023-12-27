@@ -11,17 +11,12 @@ use async_trait::async_trait;
 
 use crate::agent_traits::{Agent, ConsumerAgent, RespondingAgent};
 
-//make it as a trait
-/// UserAgent is a struct that represents a user of the system which can run code.
-#[derive(Clone)]
-pub struct UserAgent;
-
 #[async_trait]
 pub trait UserAgent2<Mrx, Mtx> {
     type Error;
 
-    async fn send_to_user(&self, message: Mrx) -> Result<(), Self::Error>;
-    async fn receive_from_user(&self) -> Result<Mtx, Self::Error>;
+    async fn send_to_user(&mut self, message: Mrx) -> Result<(), Self::Error>;
+    async fn receive_from_user(&mut self) -> Result<Mtx, Self::Error>;
 }
 
 pub enum CodeBlockFeedback {
@@ -33,17 +28,20 @@ pub enum CodeBlockFeedback {
 pub trait RequestCodeFeedback {
     type Error;
     async fn request_code_block_feedback(
-        &self,
+        &mut self,
         code_block: &CodeBlock,
     ) -> Result<CodeBlockFeedback, Self::Error>;
 }
 
 #[async_trait]
-impl<U: UserAgent2<String, String, Error = E> + Sync, E> RequestCodeFeedback for U {
+impl<U, E> RequestCodeFeedback for U
+where
+    U: UserAgent2<String, String, Error = E> + Send + Sync,
+{
     type Error = E;
 
     async fn request_code_block_feedback(
-        &self,
+        &mut self,
         code_block: &CodeBlock,
     ) -> Result<CodeBlockFeedback, E> {
         let message = format!(
@@ -57,7 +55,7 @@ impl<U: UserAgent2<String, String, Error = E> + Sync, E> RequestCodeFeedback for
 
         while response != "y" && response != "n" {
             self.send_to_user("Please enter y or n".to_string()).await?;
-            let response = self.receive_from_user().await?;
+            response = self.receive_from_user().await?;
         }
 
         match response.as_str() {
@@ -97,5 +95,65 @@ where
 
     async fn receive(&mut self, message: String) -> Result<(), Self::Error> {
         self.send_to_user(message).await
+    }
+}
+
+#[cfg(test)]
+mod tests {
+
+    use super::*;
+
+    struct UserAgentMock {
+        i: i32,
+    }
+
+    impl Default for UserAgentMock {
+        fn default() -> Self {
+            Self { i: 0 }
+        }
+    }
+
+    #[async_trait]
+    impl UserAgent2<String, String> for UserAgentMock {
+        type Error = ();
+
+        async fn send_to_user(&mut self, message: String) -> Result<(), Self::Error> {
+            println!("{}", message);
+            Ok(())
+        }
+
+        async fn receive_from_user(&mut self) -> Result<String, Self::Error> {
+            let response = match self.i {
+                0 => "n".to_string(),
+                1 => "this is the reason".to_string(),
+                _ => unreachable!(),
+            };
+
+            self.i += 1;
+
+            Ok(response)
+        }
+    }
+
+    #[tokio::test]
+    async fn test_user_agent() {
+        let mut user_agnet = UserAgentMock::default();
+
+        let code_block = CodeBlock {
+            code: "println!(\"Hello World!\");".to_string(),
+            language: crate::code_traits::Language::Rust,
+        };
+
+        let feedback = user_agnet
+            .request_code_block_feedback(&code_block)
+            .await
+            .unwrap();
+
+        match feedback {
+            CodeBlockFeedback::DenyExecution { reason } => {
+                assert_eq!(reason, "this is the reason".to_string());
+            }
+            _ => unreachable!(),
+        }
     }
 }
