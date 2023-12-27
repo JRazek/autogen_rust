@@ -14,8 +14,9 @@ use async_std::io;
 pub struct LocalUserAgent;
 
 #[async_trait]
-impl UserAgent2<String, String> for LocalUserAgent {
+impl UserAgent2<String> for LocalUserAgent {
     type Error = io::Error;
+    type Mtx = String;
 
     async fn send_to_user(&mut self, message: String) -> Result<(), Self::Error> {
         println!("user received a message: {}", message);

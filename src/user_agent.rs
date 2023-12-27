@@ -1,6 +1,6 @@
 #![allow(dead_code)]
 
-use super::code_traits::{CodeBlock, CodeExtractor, UserCodeExecutor};
+use super::code_traits::CodeBlock;
 
 mod local_user_agent;
 mod user_proxy_agent_executor;
@@ -9,14 +9,15 @@ pub use user_proxy_agent_executor::*;
 
 use async_trait::async_trait;
 
-use crate::agent_traits::{Agent, ConsumerAgent, RespondingAgent};
+use crate::agent_traits::{ConsumerAgent, RespondingAgent};
 
 #[async_trait]
-pub trait UserAgent2<Mrx, Mtx> {
+pub trait UserAgent2<Mrx> {
     type Error;
+    type Mtx;
 
     async fn send_to_user(&mut self, message: Mrx) -> Result<(), Self::Error>;
-    async fn receive_from_user(&mut self) -> Result<Mtx, Self::Error>;
+    async fn receive_from_user(&mut self) -> Result<Self::Mtx, Self::Error>;
 }
 
 pub enum CodeBlockFeedback {
@@ -34,9 +35,37 @@ pub trait RequestCodeFeedback {
 }
 
 #[async_trait]
+impl<A, Mrx, Mtx> RespondingAgent<Mrx, Mtx> for A
+where
+    A: UserAgent2<Mrx, Mtx = Mtx> + Send + Sync,
+    Mrx: Send + 'static,
+    Mtx: Send,
+{
+    type Error = A::Error;
+
+    async fn receive_and_reply(&mut self, message: Mrx) -> Result<Mtx, Self::Error> {
+        self.send_to_user(message).await?;
+        self.receive_from_user().await
+    }
+}
+
+#[async_trait]
+impl<A, Mrx> ConsumerAgent<Mrx> for A
+where
+    A: UserAgent2<Mrx> + Send + Sync,
+    Mrx: Send + 'static,
+{
+    type Error = A::Error;
+
+    async fn receive(&mut self, message: Mrx) -> Result<(), Self::Error> {
+        self.send_to_user(message).await
+    }
+}
+
+#[async_trait]
 impl<U, E> RequestCodeFeedback for U
 where
-    U: UserAgent2<String, String, Error = E> + Send + Sync,
+    U: UserAgent2<String, Mtx = String, Error = E> + Send + Sync,
 {
     type Error = E;
 
@@ -73,31 +102,6 @@ where
     }
 }
 
-#[async_trait]
-impl<A> RespondingAgent<String, String> for A
-where
-    A: UserAgent2<String, String> + Send + Sync,
-{
-    type Error = A::Error;
-
-    async fn receive_and_reply(&mut self, message: String) -> Result<String, Self::Error> {
-        self.send_to_user(message).await?;
-        self.receive_from_user().await
-    }
-}
-
-#[async_trait]
-impl<A> ConsumerAgent<String> for A
-where
-    A: UserAgent2<String, String> + Send + Sync,
-{
-    type Error = A::Error;
-
-    async fn receive(&mut self, message: String) -> Result<(), Self::Error> {
-        self.send_to_user(message).await
-    }
-}
-
 #[cfg(test)]
 mod tests {
 
@@ -114,8 +118,9 @@ mod tests {
     }
 
     #[async_trait]
-    impl UserAgent2<String, String> for UserAgentMock {
+    impl UserAgent2<String> for UserAgentMock {
         type Error = ();
+        type Mtx = String;
 
         async fn send_to_user(&mut self, message: String) -> Result<(), Self::Error> {
             println!("{}", message);
