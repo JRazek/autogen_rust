@@ -12,7 +12,7 @@ use async_trait::async_trait;
 use crate::agent_traits::{ConsumerAgent, RespondingAgent};
 
 #[async_trait]
-pub trait UserAgent2<Mrx> {
+pub trait UserAgent<Mrx> {
     type Error;
     type Mtx;
 
@@ -37,7 +37,7 @@ pub trait RequestCodeFeedback {
 #[async_trait]
 impl<A, Mrx, Mtx> RespondingAgent<Mrx, Mtx> for A
 where
-    A: UserAgent2<Mrx, Mtx = Mtx> + Send + Sync,
+    A: UserAgent<Mrx, Mtx = Mtx> + Send + Sync,
     Mrx: Send + 'static,
     Mtx: Send,
 {
@@ -52,7 +52,7 @@ where
 #[async_trait]
 impl<A, Mrx> ConsumerAgent<Mrx> for A
 where
-    A: UserAgent2<Mrx> + Send + Sync,
+    A: UserAgent<Mrx> + Send + Sync,
     Mrx: Send + 'static,
 {
     type Error = A::Error;
@@ -65,7 +65,7 @@ where
 #[async_trait]
 impl<U, E> RequestCodeFeedback for U
 where
-    U: UserAgent2<String, Mtx = String, Error = E> + Send + Sync,
+    U: UserAgent<String, Mtx = String, Error = E> + Send + Sync,
 {
     type Error = E;
 
@@ -119,7 +119,7 @@ mod tests {
     }
 
     #[async_trait]
-    impl UserAgent2<String> for UserAgentMock {
+    impl UserAgent<String> for UserAgentMock {
         type Error = ();
         type Mtx = String;
 

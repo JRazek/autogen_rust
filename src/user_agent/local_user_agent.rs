@@ -2,7 +2,7 @@
 
 use crate::code_traits::{CodeBlock, CodeExtractor, UserCodeExecutor};
 
-use super::UserAgent2;
+use super::UserAgent;
 
 use async_trait::async_trait;
 
@@ -14,7 +14,7 @@ use async_std::io;
 pub struct LocalUserAgent;
 
 #[async_trait]
-impl UserAgent2<String> for LocalUserAgent {
+impl UserAgent<String> for LocalUserAgent {
     type Error = io::Error;
     type Mtx = String;
 
