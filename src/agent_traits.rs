@@ -13,14 +13,6 @@ pub trait Agent<Mrx, Mtx> {
 }
 
 #[async_trait]
-pub trait ProducerAgent<Mtx> {
-    type Error;
-
-    /// Based on the current state of Agent, reply with a message.
-    async fn generate_prompt(&mut self) -> Result<Mtx, Self::Error>;
-}
-
-#[async_trait]
 pub trait ConsumerAgent<Mrx> {
     type Error;
 
