@@ -43,7 +43,7 @@ impl Agent<String, String> for UserAgent {
         todo!()
     }
 
-    async fn send(&mut self) -> Result<String, Self::Error> {
+    async fn reply(&mut self) -> Result<String, Self::Error> {
         todo!()
     }
 }

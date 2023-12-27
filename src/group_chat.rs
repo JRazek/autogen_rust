@@ -160,7 +160,7 @@ where
                         debug!("Sending to agent");
 
                         let sender_response: Result<M, GroupChatTaskError> = agent
-                            .send()
+                            .reply()
                             .await
                             .map_err(|err| GroupChatTaskError::OtherError(err.into()));
 
@@ -254,7 +254,7 @@ mod tests {
             debug!("Agent receive finished receiving");
         }
 
-        async fn send(&mut self) -> Result<&'static str, Self::Error> {
+        async fn reply(&mut self) -> Result<&'static str, Self::Error> {
             debug!("Agent send finished sending");
 
             Ok(self.to_send)

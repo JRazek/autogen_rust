@@ -84,7 +84,7 @@ where
         //may be optimized to process while receiving. Now just collect all messages first.
     }
 
-    async fn send(&mut self) -> Result<ExecutionResponse, Self::Error> {
+    async fn reply(&mut self) -> Result<ExecutionResponse, Self::Error> {
         todo!()
     }
 }
