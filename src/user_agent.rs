@@ -109,11 +109,12 @@ mod tests {
 
     struct UserAgentMock {
         i: i32,
+        j: i32,
     }
 
     impl Default for UserAgentMock {
         fn default() -> Self {
-            Self { i: 0 }
+            Self { i: 0, j: 0 }
         }
     }
 
@@ -123,7 +124,18 @@ mod tests {
         type Mtx = String;
 
         async fn send_to_user(&mut self, message: String) -> Result<(), Self::Error> {
-            println!("{}", message);
+            match self.j {
+                0 => {}
+                1 => assert_eq!(message, "Please enter y or n".to_string()),
+                2 => assert_eq!(
+                    message,
+                    "Please enter the reason for denying execution".to_string()
+                ),
+                _ => unreachable!(),
+            }
+
+            self.j += 1;
+
             Ok(())
         }
 
