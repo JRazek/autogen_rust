@@ -10,7 +10,7 @@ impl UserCodeExecutor for NativeCodeExecutor {
     type CodeBlock = CodeBlock;
     type Response = Result<(), ()>;
 
-    async fn execute_code_block(&self, code_block: Self::CodeBlock) -> Self::Response {
+    async fn execute_code_block(&self, code_block: &Self::CodeBlock) -> Self::Response {
         match code_block.language {
             Language::Python => {
                 info!("Executing python code block: {}", code_block.code);

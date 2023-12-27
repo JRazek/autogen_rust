@@ -9,12 +9,14 @@ use crate::code_traits::CodeBlock;
 
 use super::UserAgent;
 
+use crate::user_agent::CodeBlockFeedback;
+use futures::stream::iter as async_iter;
+
 pub struct UserProxyAgentExecutor<E>
 where
     E: UserCodeExecutor<CodeBlock = CodeBlock>,
 {
-    executor: E,
-    code_blocks: Vec<CodeBlock>,
+    pub executor: E,
 }
 
 impl<E> UserProxyAgentExecutor<E>
@@ -22,33 +24,13 @@ where
     E: UserCodeExecutor<CodeBlock = CodeBlock>,
 {
     pub fn new(executor: E) -> Self {
-        Self {
-            executor,
-            code_blocks: Vec::new(),
-        }
+        Self { executor }
     }
 }
 
 pub enum ExecutionResponse {
     Success,
     Error(String),
-}
-
-impl<Executor> UserProxyAgentExecutor<Executor>
-where
-    Executor: UserCodeExecutor<CodeBlock = CodeBlock, Response = ExecutionResponse> + Send + Sync,
-    <Executor as UserCodeExecutor>::Response: Send,
-{
-    /// User may choose what to do with an ExecutionResponse.
-    /// e.g. when error is encountered, user may abort the execution of futher code blocks.
-    pub fn run_code(&mut self) -> impl Stream<Item = ExecutionResponse> + Send + '_ {
-        let stream2 = futures::stream::iter(self.code_blocks.drain(..)).then(|code_block| async {
-            let mtx = self.executor.execute_code_block(code_block).await;
-            mtx
-        });
-
-        stream2
-    }
 }
 
 pub enum UserProxyAgentExecutorError {
@@ -72,6 +54,32 @@ where
     type Error = UserProxyAgentExecutorError;
     async fn receive(&mut self, message: Message) {
         let (user_agent, extractor, user_proxy_agent_executor) = self;
+
+        let code_blocks = extractor.extract_code_blocks(message);
+
+        for code_block in code_blocks {
+            let feedback = user_agent.request_code_block_feedback(&code_block).await;
+            match feedback {
+                CodeBlockFeedback::AllowExecution => {
+                    let execution_response = user_proxy_agent_executor
+                        .executor
+                        .execute_code_block(&code_block)
+                        .await;
+                    match execution_response {
+                        ExecutionResponse::Success => {
+                            //send success message
+                        }
+                        ExecutionResponse::Error(e) => {
+                            user_agent.receive(e).await;
+                        }
+                    }
+                }
+                CodeBlockFeedback::DenyExecution { reason } => {
+                    //TODO inform the sender about the reason
+                    break;
+                }
+            }
+        }
 
         //may be optimized to process while receiving. Now just collect all messages first.
     }

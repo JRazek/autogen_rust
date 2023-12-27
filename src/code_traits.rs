@@ -18,5 +18,5 @@ pub trait UserCodeExecutor {
     type CodeBlock;
     type Response;
 
-    async fn execute_code_block(&self, code_block: Self::CodeBlock) -> Self::Response;
+    async fn execute_code_block(&self, code_block: &Self::CodeBlock) -> Self::Response;
 }
