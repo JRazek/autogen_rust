@@ -5,14 +5,19 @@ use futures::channel::mpsc as futures_mpsc;
 
 use futures::{SinkExt, StreamExt};
 
+pub mod error;
 pub mod scheduler;
 
-use tokio_util::sync::CancellationToken;
-use tracing::{debug, error, trace};
+use tracing::{debug, error};
 
 use self::scheduler::Scheduler;
 
 use futures::channel::oneshot as futures_oneshot;
+
+use error::GroupChatTaskError;
+
+use std::fmt::Debug;
+use tokio::task::JoinHandle;
 
 pub struct GroupChat<M>
 where
@@ -21,31 +26,16 @@ where
     new_agent_tx: futures_mpsc::Sender<()>,
     new_agent_ack_rx: futures_mpsc::Receiver<futures_mpsc::Receiver<Ordering<M>>>,
 
-    chat_task_dealine: CancellationToken,
+    group_chat_task_result: JoinHandle<Result<(), GroupChatTaskError>>,
 }
-
-pub trait Error: std::error::Error + Send + Sync + 'static {}
-
-impl<E: std::error::Error + Send + Sync + 'static> Error for E {}
-
-impl<E: Error> From<E> for Box<dyn Error> {
-    fn from(err: E) -> Self {
-        Box::new(err)
-    }
-}
-
-#[derive(Debug)]
-struct SendError;
 
 enum Ordering<M>
 where
     M: Send + 'static,
 {
-    Send(futures_oneshot::Sender<Result<M, Box<dyn Error>>>),
-    Receive(M, futures_oneshot::Sender<Result<(), Box<dyn Error>>>),
+    Send(futures_oneshot::Sender<Result<M, GroupChatTaskError>>),
+    Receive(M, futures_oneshot::Sender<Result<(), GroupChatTaskError>>),
 }
-
-use std::fmt::Debug;
 
 impl<M> GroupChat<M>
 where
@@ -56,13 +46,10 @@ where
         S: Scheduler + Send + 'static,
     {
         let (new_agent_tx, new_agent_rx) = futures_mpsc::channel(1);
-        let (new_agent_ack_tx, new_agent_ack_rx) = futures_mpsc::channel(1);
+        let (new_agent_ack_tx, new_agent_ack_rx) =
+            futures_mpsc::channel::<futures_mpsc::Receiver<_>>(1);
 
-        let chat_task_dealine = CancellationToken::new();
-
-        let chat_task_dealine_child = chat_task_dealine.child_token();
-
-        tokio::spawn(async move {
+        let group_chat_task_result = tokio::spawn(async move {
             let mut ordering_tx_vec: Vec<_> = new_agent_rx
                 .then(|_| {
                     let mut new_agent_ack_tx = new_agent_ack_tx.clone();
@@ -72,13 +59,20 @@ where
 
                         let (ordering_tx, ordering_rx) = futures_mpsc::channel::<Ordering<M>>(1);
 
-                        new_agent_ack_tx.send(ordering_rx).await.unwrap();
+                        new_agent_ack_tx
+                            .send(ordering_rx)
+                            .await
+                            .map_err(|_| GroupChatTaskError::SendError)?;
 
-                        ordering_tx
+                        Ok::<_, GroupChatTaskError>(ordering_tx)
                     }
                 })
-                .collect()
-                .await;
+                .map(|res| res)
+                .collect::<Vec<_>>()
+                .await
+                .into_iter()
+                .collect::<Result<_, _>>()
+                .inspect_err(|err| error!("Error in new agent: {}", err))?;
 
             while let Some(agent_idx) = scheduler.next_agent(ordering_tx_vec.len()) {
                 debug!("Next agent: {}", agent_idx);
@@ -99,7 +93,7 @@ where
                     .await
                     .unwrap();
 
-                let sender_response = sender_response_rx.await.unwrap().unwrap();
+                let sender_response = sender_response_rx.await.unwrap()?;
 
                 use futures::stream::iter as async_iter;
 
@@ -125,32 +119,24 @@ where
                     .await;
 
                 async_iter(receive_responses_rx_vec)
-                    .for_each(|rx| async move {
-                        debug!("Waiting for receive response");
-                        let receive_response = rx.await.unwrap();
-
-                        match receive_response {
-                            Ok(()) => {
-                                trace!("received response in receive");
-                            }
-                            Err(err) => {
-                                error!("Error in receive: {}", err);
-                            }
-                        }
-                    })
-                    .await;
+                    .then(|rx| async move { rx.await.unwrap() })
+                    .collect::<Vec<_>>()
+                    .await
+                    .into_iter()
+                    .collect::<Result<_, _>>()?;
 
                 debug!("Agent round finished");
             }
 
             debug!("Chat task finished");
-            chat_task_dealine.cancel();
+
+            Ok::<(), GroupChatTaskError>(())
         });
 
         GroupChat {
             new_agent_tx,
             new_agent_ack_rx,
-            chat_task_dealine: chat_task_dealine_child,
+            group_chat_task_result,
         }
     }
 
@@ -173,12 +159,12 @@ where
                     Ordering::Send(sender_response_tx) => {
                         debug!("Sending to agent");
 
-                        let sender_response: Result<M, Box<dyn Error>> =
-                            agent.send().await.map_err(|err| err.into());
+                        let sender_response: Result<M, GroupChatTaskError> = agent
+                            .send()
+                            .await
+                            .map_err(|err| GroupChatTaskError::OtherError(err.into()));
 
-                        if let Err(_) = sender_response_tx.send(sender_response) {
-                            panic!("Chat task died");
-                        }
+                        sender_response_tx.send(sender_response).unwrap();
                     }
                     Ordering::Receive(messasge, receive_result_tx) => {
                         debug!("Receiving from agent");
@@ -186,9 +172,7 @@ where
                         agent.receive(messasge).await;
 
                         //might forward all errors here
-                        if let Err(_) = receive_result_tx.send(Ok(())) {
-                            panic!("Chat task died");
-                        }
+                        receive_result_tx.send(Ok(())).unwrap();
 
                         debug!("Agent receive finished receiving. Waiting on barrier");
                     }
@@ -200,11 +184,11 @@ where
     }
 
     //just drop all the channels in Chat and allow the scheduled tasks to leave loop.
-    pub async fn start(self) {
+    pub async fn start(self) -> Result<(), GroupChatTaskError> {
         drop(self.new_agent_tx);
         drop(self.new_agent_ack_rx);
 
-        self.chat_task_dealine.cancelled().await;
+        self.group_chat_task_result.await.unwrap()
     }
 }
 
@@ -315,7 +299,7 @@ mod tests {
         chat.add_agent(agent2).await;
         chat.add_agent(agent3).await;
 
-        chat.start().await;
+        chat.start().await.unwrap();
 
         debug!("Waiting for task done");
         assert_eq!(task_done_rx.collect::<Vec<_>>().await.len(), 3);
