@@ -11,13 +11,15 @@ use futures::{SinkExt, StreamExt};
 pub mod scheduler;
 
 use tokio_util::sync::CancellationToken;
-use tracing::debug;
+use tracing::{debug, error, info, trace, warn};
 
 use self::scheduler::Scheduler;
 
+use futures::channel::oneshot as futures_oneshot;
+
 pub struct GroupChat<M>
 where
-    M: Clone + Send + 'static,
+    M: Send + 'static,
 {
     new_agent_tx: futures_mpsc::Sender<()>,
     new_agent_ack_rx: futures_mpsc::Receiver<futures_mpsc::Receiver<Ordering<M>>>,
@@ -25,17 +27,23 @@ where
     chat_task_dealine: CancellationToken,
 }
 
+pub trait Error: Send + Sync + 'static {}
+
+struct SendError;
+
 enum Ordering<M>
 where
-    M: Clone + Send + 'static,
+    M: Send + 'static,
 {
-    Receive(broadcast::Receiver<M>, Arc<Barrier>),
-    Send(broadcast::Sender<M>, Arc<Barrier>),
+    Send(futures_oneshot::Sender<Result<Result<M, SendError>, Box<dyn Error>>>),
+    Receive(M, futures_oneshot::Sender<Result<(), Box<dyn Error>>>),
 }
+
+use std::fmt::Debug;
 
 impl<M> GroupChat<M>
 where
-    M: Clone + Send + 'static,
+    M: Clone + Send + Sync + Debug + 'static,
 {
     pub async fn new<S>(mut scheduler: S) -> GroupChat<M>
     where
@@ -56,7 +64,7 @@ where
                     async move {
                         debug!("New agent spawned");
 
-                        let (ordering_tx, ordering_rx) = futures_mpsc::channel(1);
+                        let (ordering_tx, ordering_rx) = futures_mpsc::channel::<Ordering<M>>(1);
 
                         new_agent_ack_tx.send(ordering_rx).await.unwrap();
 
@@ -72,40 +80,60 @@ where
                 if agent_idx >= ordering_tx_vec.len() {
                     panic!("Invalid agent index: {}", agent_idx);
                 }
-
                 //this accounts for all the tasks + the current one.
-                let barrier = Arc::new(Barrier::new(ordering_tx_vec.len() + 1));
-
-                let (broadcast_tx, _) = broadcast::channel(1024);
-
                 debug!(
                     "Sending Send(broadcast_tx) to ordering_tx_vec[{}]",
                     agent_idx
                 );
 
+                let (sender_response_tx, sender_response_rx) = futures_oneshot::channel();
+
                 ordering_tx_vec[agent_idx]
-                    .send(Ordering::Send(broadcast_tx.clone(), barrier.clone()))
+                    .send(Ordering::Send(sender_response_tx))
                     .await
                     .unwrap();
 
+                let Ok(sender_response) = sender_response_rx.await.unwrap() else {
+                    panic!("Sender response error");
+                };
+
                 use futures::stream::iter as async_iter;
-                async_iter(ordering_tx_vec.clone())
+
+                let receive_responses_rx_vec = async_iter(ordering_tx_vec.clone())
                     .enumerate()
                     .filter(|&(idx, _)| async move { idx != agent_idx })
-                    .for_each(|(idx, mut tx)| {
-                        let broadcast_rx = broadcast_tx.subscribe();
-                        let barrier = barrier.clone();
-
+                    .then(|(idx, mut tx)| {
+                        let sender_response = sender_response.clone();
                         async move {
                             debug!("Sending Receive(broadcast_rx) to ordering_tx_vec[{}]", idx);
-                            tx.send(Ordering::Receive(broadcast_rx, barrier))
+
+                            let (receive_response_tx, receive_response_rx) =
+                                futures_oneshot::channel::<Result<_, _>>();
+
+                            tx.send(Ordering::Receive(sender_response, receive_response_tx))
                                 .await
                                 .unwrap();
+
+                            receive_response_rx
                         }
                     })
+                    .collect::<Vec<futures_oneshot::Receiver<_>>>()
                     .await;
 
-                barrier.wait().await;
+                async_iter(receive_responses_rx_vec).for_each(|rx| async move {
+                    debug!("Waiting for receive response");
+                    let receive_response = rx.await.unwrap();
+
+                    match receive_response {
+                        Ok(()) => {
+                            trace!("received response in receive");
+                        }
+                        Err(err) => {
+                            error!("Error in receive");
+                        }
+                    }
+                });
+
                 debug!("Agent round finished");
             }
 
@@ -123,6 +151,7 @@ where
     pub async fn add_agent<A>(&mut self, mut agent: A)
     where
         A: Agent<M, M> + Send + 'static,
+        <A as Agent<M, M>>::Error: std::error::Error + Send + Sync + 'static + 'static,
     {
         self.new_agent_tx.send(()).await.expect("Chat task died");
 
@@ -135,41 +164,27 @@ where
         tokio::spawn(async move {
             while let Some(order) = ordering_rx.next().await {
                 match order {
-                    Ordering::Receive(mut broadcast_rx, barrier) => {
-                        debug!("Receiving from agent");
-
-                        let (mut futures_tx, futures_rx) = futures_mpsc::channel(10);
-
-                        tokio::spawn(async move {
-                            while let Ok(msg) = broadcast_rx.recv().await {
-                                debug!("redirecting message from agent");
-                                futures_tx.send(msg).await.unwrap();
-                            }
-                        });
-
-                        agent.receive(futures_rx).await;
-
-                        debug!("Agent receive finished receiving. Waiting on barrier");
-                        barrier.wait().await;
-                    }
-                    Ordering::Send(broadcast_tx, barrier) => {
+                    Ordering::Send(sender_response_tx) => {
                         debug!("Sending to agent");
 
-                        let (futures_tx, mut futures_rx) = futures_mpsc::channel(10);
+                        let sender_response: Result<M, SendError> =
+                            agent.send().await.map_err(|_| SendError);
 
-                        tokio::spawn(async move {
-                            while let Some(msg) = futures_rx.next().await {
-                                debug!("redirecting message to agent");
-                                if let Err(_) = broadcast_tx.send(msg) {
-                                    panic!("Agent send failed");
-                                }
-                            }
-                        });
+                        if let Err(_) = sender_response_tx.send(Ok(sender_response)) {
+                            panic!("Chat task died");
+                        }
+                    }
+                    Ordering::Receive(messasge, receive_result_tx) => {
+                        debug!("Receiving from agent");
 
-                        agent.send(futures_tx).await;
+                        agent.receive(messasge).await;
 
-                        debug!("Agent send finished receiving. Waiting on barrier");
-                        barrier.wait().await;
+                        //might forward all errors here
+                        if let Err(_) = receive_result_tx.send(Ok(())) {
+                            panic!("Chat task died");
+                        }
+
+                        debug!("Agent receive finished receiving. Waiting on barrier");
                     }
                 }
 
@@ -199,7 +214,7 @@ mod tests {
 
     #[derive(Clone)]
     struct TestAgent {
-        to_send: Vec<&'static str>,
+        to_send: &'static str,
 
         received: Vec<&'static str>,
 
@@ -218,12 +233,8 @@ mod tests {
     impl Agent<&'static str, &'static str> for TestAgent {
         type Error = ();
 
-        async fn receive(&mut self, mut stream: impl Stream<Item = &'static str> + Unpin + Send) {
-            debug!("Agent receive started receiving");
-            if let Some(msg) = stream.next().await {
-                debug!("Received message: {}", msg);
-                self.received.push(msg);
-            }
+        async fn receive(&mut self, mut msg: &'static str) {
+            debug!("Received message: {}", msg);
 
             if self.received.len() == self.expected.len() {
                 assert_eq!(self.received, self.expected);
@@ -236,20 +247,10 @@ mod tests {
             debug!("Agent receive finished receiving");
         }
 
-        async fn send(
-            &mut self,
-            mut sink: impl Sink<&'static str> + Unpin + Send,
-        ) -> Result<(), ()> {
-            for msg in self.to_send.drain(..) {
-                debug!("Sending message: {}", msg);
-                if let Err(_) = sink.send(msg).await {
-                    panic!("Agent send failed");
-                }
-            }
-
+        async fn send(&mut self) -> Result<&'static str, ()> {
             debug!("Agent send finished sending");
 
-            Ok(())
+            Ok(self.to_send)
         }
     }
 
@@ -267,21 +268,21 @@ mod tests {
         let (task_done_tx, task_done_rx) = futures_mpsc::channel(10);
 
         let agent1 = TestAgent {
-            to_send: vec!["phrase1"],
+            to_send: "phrase1",
             expected: vec!["phrase2", "phrase3"],
             received: Vec::new(),
             task_done_tx: task_done_tx.clone(),
         };
 
         let agent2 = TestAgent {
-            to_send: vec!["phrase2"],
+            to_send: "phrase2",
             expected: vec!["phrase1", "phrase3"],
             received: Vec::new(),
             task_done_tx: task_done_tx.clone(),
         };
 
         let agent3 = TestAgent {
-            to_send: vec!["phrase3"],
+            to_send: "phrase3",
             expected: vec!["phrase1", "phrase2"],
             received: Vec::new(),
             task_done_tx,

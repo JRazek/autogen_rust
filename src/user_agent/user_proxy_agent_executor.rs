@@ -70,14 +70,13 @@ where
     <Executor as UserCodeExecutor>::Response: Send,
 {
     type Error = UserProxyAgentExecutorError;
-    async fn receive(&mut self, stream: impl Stream<Item = Message> + Unpin + Send) {
+    async fn receive(&mut self, message: Message) {
         let (user_agent, extractor, user_proxy_agent_executor) = self;
+
+        //may be optimized to process while receiving. Now just collect all messages first.
     }
 
-    async fn send(
-        &mut self,
-        sink: impl Sink<ExecutionResponse> + Unpin + Send,
-    ) -> Result<(), Self::Error> {
+    async fn send(&mut self) -> Result<ExecutionResponse, Self::Error> {
         todo!()
     }
 }

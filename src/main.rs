@@ -1,5 +1,7 @@
 #![feature(trait_alias)]
 #![feature(result_option_inspect)]
+#![feature(async_iterator)]
+#![feature(async_iter_from_iter)]
 
 mod chat;
 mod code_traits;
