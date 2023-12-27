@@ -13,7 +13,6 @@ use group_chat::scheduler::RoundRobin;
 use group_chat::GroupChat;
 
 use code_traits::NativeCodeExecutor;
-use user_agent::UserProxyAgentExecutor;
 
 #[tokio::main]
 async fn main() {
@@ -28,7 +27,7 @@ async fn main() {
 
     let chat: GroupChat<String> = GroupChat::new(RoundRobin::default()).await;
 
-    let user_proxy_agent_executor = UserProxyAgentExecutor::new(NativeCodeExecutor);
+    let native_code_executor = NativeCodeExecutor;
 
     //    chat.run(RoundRobinScheduler::default()).await.unwrap();
 }

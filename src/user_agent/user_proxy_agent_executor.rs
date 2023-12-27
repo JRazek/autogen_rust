@@ -10,33 +10,18 @@ use super::{RequestCodeFeedback, UserAgent};
 
 use crate::user_agent::CodeBlockFeedback;
 
-pub struct UserProxyAgentExecutor<E>
-where
-    E: UserCodeExecutor<CodeBlock = CodeBlock>,
-{
-    pub executor: E,
-}
-
-impl<E> UserProxyAgentExecutor<E>
-where
-    E: UserCodeExecutor<CodeBlock = CodeBlock>,
-{
-    pub fn new(executor: E) -> Self {
-        Self { executor }
-    }
-}
-
-enum ExecutionResponse {
+#[derive(Debug)]
+pub enum ExecutionResponse {
     Success,
-    Error(String),
-}
-
-pub enum UserProxyAgentExecutorError {
-    SendError,
-    DeniedExecution(String),
     ExecutionError(String),
 }
 
+#[derive(Debug)]
+pub enum UserProxyAgentExecutorError {
+    DeniedExecution(String),
+}
+
+#[derive(Debug)]
 pub enum Message {
     Text(String),
 }
@@ -44,20 +29,25 @@ pub enum Message {
 use crate::code_traits::CodeExtractor;
 
 #[async_trait]
-impl<UA, Executor, Extractor> RespondingAgent<Message>
-    for (UA, Extractor, UserProxyAgentExecutor<Executor>)
+impl<UA, Executor, Extractor> RespondingAgent<Message> for (UA, Extractor, Executor)
 where
-    UA: UserAgent<String, Mtx = String, Error = ()> + Send + Sync,
+    UA: UserAgent<String, Mtx = String> + Send + Sync,
     Executor: UserCodeExecutor<CodeBlock = CodeBlock, Response = ExecutionResponse> + Send + Sync,
     Extractor: CodeExtractor<Message, CodeBlock = CodeBlock> + Send,
     <Executor as UserCodeExecutor>::Response: Send,
+    <UA as UserAgent<String>>::Error: std::error::Error,
 {
-    type Mtx = ();
+    type Mtx = Vec<ExecutionResponse>;
     type Error = UserProxyAgentExecutorError;
-    async fn receive_and_reply(&mut self, message: Message) -> Result<(), Self::Error> {
+    async fn receive_and_reply(
+        &mut self,
+        message: Message,
+    ) -> Result<Vec<ExecutionResponse>, Self::Error> {
         let (user_agent, extractor, user_proxy_agent_executor) = self;
 
         let code_blocks = extractor.extract_code_blocks(message);
+
+        let mut results = vec![];
 
         for code_block in code_blocks {
             let feedback = user_agent
@@ -67,18 +57,10 @@ where
             match feedback {
                 CodeBlockFeedback::AllowExecution => {
                     let execution_response = user_proxy_agent_executor
-                        .executor
                         .execute_code_block(&code_block)
                         .await;
-                    match execution_response {
-                        ExecutionResponse::Success => {
-                            //send success message
-                        }
-                        ExecutionResponse::Error(e) => {
-                            user_agent.receive(e.clone()).await.unwrap();
-                            return Err(UserProxyAgentExecutorError::ExecutionError(e));
-                        }
-                    }
+
+                    results.push(execution_response);
                 }
                 CodeBlockFeedback::DenyExecution { reason } => {
                     return Err(UserProxyAgentExecutorError::DeniedExecution(reason));
@@ -86,6 +68,6 @@ where
             }
         }
 
-        Ok(())
+        Ok(results)
     }
 }

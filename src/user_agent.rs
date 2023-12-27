@@ -9,9 +9,8 @@ pub use user_proxy_agent_executor::*;
 
 use async_trait::async_trait;
 
-use crate::agent_traits::{ConsumerAgent, RespondingAgent};
+use crate::agent_traits::{ConsumerAgent, ProducerAgent, RespondingAgent};
 
-//TODO - delete, replace group chat with Consumer/Responding Agents
 #[async_trait]
 pub trait UserAgent<Mrx> {
     type Mtx;
