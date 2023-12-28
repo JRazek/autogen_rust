@@ -31,9 +31,12 @@ where
 
     loop {
         let user_agent = &mut code_executor.0;
-        let prompt = user_agent.receive_from_user().await?;
+        user_agent
+            .send_to_user("Please ask agent to write python code. Note: its scripted".to_string())
+            .await
+            .unwrap();
 
-        debug!("received prompt from user: {}", prompt);
+        let prompt = user_agent.receive_from_user().await?;
 
         let prompt_response = conversational_agent.receive_and_reply(prompt).await?;
 

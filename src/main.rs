@@ -60,12 +60,13 @@ impl RespondingAgent<Result<Vec<ExecutionResponse>, UserProxyAgentExecutorError>
 }
 
 use chat::collaborative_chat;
+use tracing::debug;
 
 #[tokio::main]
 async fn main() {
     tracing::subscriber::set_global_default(
         tracing_subscriber::FmtSubscriber::builder()
-            .with_env_filter(tracing_subscriber::EnvFilter::from_default_env())
+            .with_max_level(tracing::Level::DEBUG)
             .finish(),
     )
     .unwrap();
@@ -76,6 +77,7 @@ async fn main() {
 
     let llm_mock = LlmMock { request_index: 0 };
 
+    debug!("Starting chat");
     collaborative_chat(user_agent, code_extractor, native_code_executor, llm_mock)
         .await
         .unwrap();
