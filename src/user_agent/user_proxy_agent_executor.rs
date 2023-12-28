@@ -1,4 +1,4 @@
-use crate::agent_traits::{ConsumerAgent, RespondingAgent};
+use crate::agent_traits::RespondingAgent;
 
 use async_trait::async_trait;
 

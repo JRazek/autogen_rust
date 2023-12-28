@@ -11,7 +11,7 @@ use tracing::{debug, error};
 
 use self::scheduler::Scheduler;
 
-use crate::agent_traits::{ConsumerAgent, ProducerAgent, RespondingAgent};
+use crate::agent_traits::{ConsumerAgent, ProducerAgent};
 
 use futures::channel::oneshot as futures_oneshot;
 
@@ -19,8 +19,6 @@ use error::GroupChatTaskError;
 
 use std::fmt::Debug;
 use tokio::task::JoinHandle;
-
-mod group_chat_agent;
 
 pub struct GroupChat<M>
 where

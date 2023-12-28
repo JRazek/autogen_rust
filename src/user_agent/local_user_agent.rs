@@ -1,7 +1,5 @@
 #![allow(dead_code)]
 
-use crate::code_traits::{CodeBlock, CodeExtractor, UserCodeExecutor};
-
 use super::UserAgent;
 
 use async_trait::async_trait;

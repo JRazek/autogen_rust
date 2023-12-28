@@ -9,7 +9,7 @@ pub use user_proxy_agent_executor::*;
 
 use async_trait::async_trait;
 
-use crate::agent_traits::{ConsumerAgent, ProducerAgent, RespondingAgent};
+use crate::agent_traits::{ConsumerAgent, RespondingAgent};
 
 #[async_trait]
 pub trait UserAgent<Mrx> {

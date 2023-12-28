@@ -1,6 +1,6 @@
 #![allow(dead_code)]
 
-use crate::agent_traits::{ConsumerAgent, ProducerAgent, RespondingAgent};
+use crate::agent_traits::RespondingAgent;
 use crate::code_traits::{CodeBlock, CodeExtractor, UserCodeExecutor};
 use crate::user_agent::{ExecutionResponse, Message, UserAgent, UserProxyAgentExecutorError};
 
