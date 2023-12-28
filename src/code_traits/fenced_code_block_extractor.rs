@@ -61,7 +61,13 @@ mod tests {
     fn test_extract_code_blocks() {
         let messages = vec![
             "```rust\nfn main() {\nprintln!(\"Hello, world!\");\n}\n```".to_string(),
-            "```python\nprint(\"Hello, world!\")\n```".to_string(),
+            //TODO fix this test case
+            r#"
+            ```python
+                print(\"Hello, world!\")
+            ```
+             "#
+            .to_string(),
         ];
 
         let extractor = FencedCodeBlockExtractor;

@@ -5,10 +5,12 @@ use super::code_traits::CodeBlock;
 mod local_user_agent;
 mod user_proxy_agent_executor;
 
-pub use user_proxy_agent_executor::*;
 pub use local_user_agent::*;
+pub use user_proxy_agent_executor::*;
 
 use async_trait::async_trait;
+
+use tracing::debug;
 
 use crate::agent_traits::{ConsumerAgent, RespondingAgent};
 
@@ -75,6 +77,8 @@ where
         &mut self,
         code_block: &CodeBlock,
     ) -> Result<CodeBlockFeedback, E> {
+        debug!("Requesting code block feedback..");
+
         let message = format!(
             r#"You are asked for permission to compile/execute the following code block:\n{:?}"#,
             code_block

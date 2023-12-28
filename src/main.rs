@@ -32,11 +32,7 @@ impl RespondingAgent<String> for LlmMock {
     async fn receive_and_reply(&mut self, _: String) -> Result<Message, Self::Error> {
         let response = match self.request_index {
             0 => "Hello, I'm a helpful agent.".to_string(),
-            1 => r#"Certainly, I can code in python!
-                    ```python
-                    print("Hello World!")
-                    ```"#
-                .to_string(),
+            1 => "```rust\nfn main() {\nprintln!(\"Hello, world!\");\n}\n```".to_string(),
             _ => panic!("Unexpected request"),
         };
 

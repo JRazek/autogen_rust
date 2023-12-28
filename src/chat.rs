@@ -19,7 +19,7 @@ where
     <Executor as UserCodeExecutor>::Response: Send,
     <UA as UserAgent<String>>::Error: std::error::Error + 'static,
 
-    A: RespondingAgent<String, Mtx = Message>,
+    A: RespondingAgent<String, Mtx = Message> + Send + Sync,
     A: RespondingAgent<Result<Vec<ExecutionResponse>, UserProxyAgentExecutorError>, Mtx = Message>,
     <A as RespondingAgent<Result<Vec<ExecutionResponse>, UserProxyAgentExecutorError>>>::Error:
         std::error::Error + 'static,

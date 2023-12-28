@@ -28,6 +28,8 @@ pub enum Message {
 
 use crate::code_traits::CodeExtractor;
 
+use tracing::debug;
+
 #[async_trait]
 impl<UA, Executor, Extractor> RespondingAgent<Message> for (UA, Extractor, Executor)
 where
@@ -45,9 +47,13 @@ where
     ) -> Result<Vec<ExecutionResponse>, Self::Error> {
         let (user_agent, extractor, user_proxy_agent_executor) = self;
 
+        debug!("called receive_and_reply in UserProxyAgentExecutor");
+
         match message {
             Message::Text(message) => {
                 let code_blocks = extractor.extract_code_blocks(message);
+
+                debug!("decoded following code blocks: {:?}", code_blocks);
 
                 let mut results = vec![];
 
