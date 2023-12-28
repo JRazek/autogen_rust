@@ -4,6 +4,8 @@ use crate::agent_traits::RespondingAgent;
 use crate::code_traits::{CodeBlock, CodeExtractor, UserCodeExecutor};
 use crate::user_agent::{ExecutionResponse, Message, UserAgent, UserProxyAgentExecutorError};
 
+use tracing::debug;
+
 pub async fn collaborative_chat<UA, Extractor, Executor, A>(
     user_agent: UA,
     code_extractor: Extractor,
@@ -24,9 +26,14 @@ where
     <A as RespondingAgent<String>>::Error: std::error::Error + 'static,
 {
     let mut code_executor = (user_agent, code_extractor, user_code_executor);
+
+    debug!("starting chat..");
+
     loop {
         let user_agent = &mut code_executor.0;
         let prompt = user_agent.receive_from_user().await?;
+
+        debug!("received prompt from user: {}", prompt);
 
         let prompt_response = conversational_agent.receive_and_reply(prompt).await?;
 
