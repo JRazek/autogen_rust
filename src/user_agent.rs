@@ -6,6 +6,7 @@ mod local_user_agent;
 mod user_proxy_agent_executor;
 
 pub use user_proxy_agent_executor::*;
+pub use local_user_agent::*;
 
 use async_trait::async_trait;
 

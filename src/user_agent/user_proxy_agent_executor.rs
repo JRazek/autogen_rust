@@ -33,7 +33,7 @@ impl<UA, Executor, Extractor> RespondingAgent<Message> for (UA, Extractor, Execu
 where
     UA: UserAgent<String, Mtx = String> + Send + Sync,
     Executor: UserCodeExecutor<CodeBlock = CodeBlock, Response = ExecutionResponse> + Send + Sync,
-    Extractor: CodeExtractor<Message, CodeBlock = CodeBlock> + Send,
+    Extractor: CodeExtractor<String, CodeBlock = CodeBlock> + Send,
     <Executor as UserCodeExecutor>::Response: Send,
     <UA as UserAgent<String>>::Error: std::error::Error,
 {
@@ -45,29 +45,34 @@ where
     ) -> Result<Vec<ExecutionResponse>, Self::Error> {
         let (user_agent, extractor, user_proxy_agent_executor) = self;
 
-        let code_blocks = extractor.extract_code_blocks(message);
+        match message {
+            Message::Text(message) => {
+                let code_blocks = extractor.extract_code_blocks(message);
 
-        let mut results = vec![];
+                let mut results = vec![];
 
-        for code_block in code_blocks {
-            let feedback = user_agent
-                .request_code_block_feedback(&code_block)
-                .await
-                .unwrap();
-            match feedback {
-                CodeBlockFeedback::AllowExecution => {
-                    let execution_response = user_proxy_agent_executor
-                        .execute_code_block(&code_block)
-                        .await;
+                for code_block in code_blocks {
+                    let feedback = user_agent
+                        .request_code_block_feedback(&code_block)
+                        .await
+                        .unwrap();
+                    match feedback {
+                        CodeBlockFeedback::AllowExecution => {
+                            let execution_response = user_proxy_agent_executor
+                                .execute_code_block(&code_block)
+                                .await;
 
-                    results.push(execution_response);
+                            results.push(execution_response);
+                        }
+                        CodeBlockFeedback::DenyExecution { reason } => {
+                            return Err(UserProxyAgentExecutorError::DeniedExecution(reason));
+                        }
+                    }
                 }
-                CodeBlockFeedback::DenyExecution { reason } => {
-                    return Err(UserProxyAgentExecutorError::DeniedExecution(reason));
-                }
+
+                Ok(results)
             }
+            _ => unimplemented!(),
         }
-
-        Ok(results)
     }
 }

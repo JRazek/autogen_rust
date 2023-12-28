@@ -12,7 +12,54 @@ mod agent_traits;
 use group_chat::scheduler::RoundRobin;
 use group_chat::GroupChat;
 
-use code_traits::NativeCodeExecutor;
+use async_trait::async_trait;
+
+use code_traits::{FencedCodeBlockExtractor, NativeCodeExecutor};
+
+use user_agent::{ExecutionResponse, LocalUserAgent, Message, UserProxyAgentExecutorError};
+
+use agent_traits::RespondingAgent;
+
+struct LlmMock {
+    request_index: usize,
+}
+
+#[async_trait]
+impl RespondingAgent<String> for LlmMock {
+    type Mtx = Message;
+    type Error = std::io::Error;
+
+    async fn receive_and_reply(&mut self, _: String) -> Result<Message, Self::Error> {
+        let response = match self.request_index {
+            0 => "Hello, I'm a helpful agent.".to_string(),
+            1 => r#"Certainly, I can code in python!
+                    ```python
+                    print("Hello World!")
+                    ```"#
+                .to_string(),
+            _ => panic!("Unexpected request"),
+        };
+
+        self.request_index += 1;
+
+        Ok(Message::Text(response))
+    }
+}
+
+#[async_trait]
+impl RespondingAgent<Result<Vec<ExecutionResponse>, UserProxyAgentExecutorError>> for LlmMock {
+    type Mtx = Message;
+    type Error = std::io::Error;
+
+    async fn receive_and_reply(
+        &mut self,
+        _: Result<Vec<ExecutionResponse>, UserProxyAgentExecutorError>,
+    ) -> Result<Message, Self::Error> {
+        Ok(Message::Text("nice..".to_string()))
+    }
+}
+
+use chat::collaborative_chat;
 
 #[tokio::main]
 async fn main() {
@@ -23,11 +70,13 @@ async fn main() {
     )
     .unwrap();
 
-    //    let user_agent = UserAgent;
-
-    let chat: GroupChat<String> = GroupChat::new(RoundRobin::default()).await;
-
+    let user_agent = LocalUserAgent;
     let native_code_executor = NativeCodeExecutor;
+    let code_extractor = FencedCodeBlockExtractor;
 
-    //    chat.run(RoundRobinScheduler::default()).await.unwrap();
+    let llm_mock = LlmMock { request_index: 0 };
+
+    collaborative_chat(user_agent, code_extractor, native_code_executor, llm_mock)
+        .await
+        .unwrap();
 }

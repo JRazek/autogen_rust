@@ -5,10 +5,12 @@ use super::{CodeBlock, Language, UserCodeExecutor};
 
 pub struct NativeCodeExecutor;
 
+use crate::user_agent::ExecutionResponse;
+
 #[async_trait]
 impl UserCodeExecutor for NativeCodeExecutor {
     type CodeBlock = CodeBlock;
-    type Response = Result<(), ()>;
+    type Response = ExecutionResponse;
 
     async fn execute_code_block(&self, code_block: &Self::CodeBlock) -> Self::Response {
         match code_block.language {
@@ -20,6 +22,6 @@ impl UserCodeExecutor for NativeCodeExecutor {
             }
         }
 
-        Ok(())
+        ExecutionResponse::Success
     }
 }
