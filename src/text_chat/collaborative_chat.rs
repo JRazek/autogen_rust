@@ -48,7 +48,7 @@ where
         match ca_response {
             CollaborativeAgentResponse::CommentedCodeBlock(ref commented_code_block) => {
                 user_agent
-                    .silent_receive(collaborative_agent.name(), &ca_response)
+                    .silent_receive_collaborative_agent_response(collaborative_agent.name(), &ca_response)
                     .await
                     .map_err(CollaborativeChatError::ChatUserAgent)?;
 
