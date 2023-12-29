@@ -67,7 +67,7 @@ pub enum Message<'a> {
         comment: &'a str,
         code_block: &'a CodeBlock,
     },
-    CodeExecutionResult(&'a CodeBlockExecutionResult),
+    CodeBlockExecutionResult(&'a CodeBlockExecutionResult),
 }
 
 /// This is a convenience implementation of ChatUserAgent for any Agent that implements
@@ -153,7 +153,7 @@ where
         &mut self,
         result: &CodeBlockExecutionResult,
     ) -> Result<(), Self::Error> {
-        let message = Message::CodeExecutionResult(result);
+        let message = Message::CodeBlockExecutionResult(result);
 
         let message = Mrx::try_from(message).map_err(|_| UserAgentError::TryFromMessage)?;
 

@@ -110,6 +110,7 @@ pub enum Message<'a> {
     CodeExecutionResult(&'a CodeBlockExecutionResult),
 }
 
+///This may be used when the agent returns output as a string or any other type.
 #[async_trait]
 impl<CA, Mrx, Mtx> CollaborativeAgent for CA
 where
