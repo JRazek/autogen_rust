@@ -1,5 +1,5 @@
-mod chat_user_agent;
-mod code;
-mod collaborative_chat;
-mod collaborative_agent;
-mod collaborative_chat_error;
+pub mod chat_user_agent;
+pub mod code;
+pub mod collaborative_chat;
+pub mod collaborative_agent;
+pub mod collaborative_chat_error;

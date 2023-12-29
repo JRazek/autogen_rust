@@ -1,3 +1,3 @@
-mod text_chat;
-mod agent_traits;
-mod user_agent;
+pub mod text_chat;
+pub mod agent_traits;
+pub mod user_agent;

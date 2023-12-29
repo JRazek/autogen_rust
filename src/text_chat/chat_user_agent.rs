@@ -11,6 +11,8 @@ pub enum CodeBlockFeedback {
 
 use super::code::CodeBlockExecutionResult;
 
+use crate::agent_traits::{ConsumerAgent, ProducerAgent};
+
 #[async_trait]
 pub trait ChatUserAgent {
     type Error;
@@ -40,11 +42,15 @@ pub trait ChatUserAgent {
     ) -> Result<(), Self::Error>;
 }
 
-use crate::user_agent::UserAgent;
-
-pub enum UserAgentError<S, R> {
-    Sending(S),
-    Receiving(R),
+//use crate::user_agent::UserAgent;
+//
+pub enum UserAgentError<C, R>
+where
+    C: ProducerAgent,
+    R: ConsumerAgent,
+{
+    Sending(C::Error),
+    Receiving(R::Error),
     TryFromMessage,
     TryIntoString,
 }
@@ -66,16 +72,19 @@ pub enum Message<'a> {
     CodeExecutionResult(&'a CodeBlockExecutionResult),
 }
 
-/// This is a convenience implementation of ChatUserAgent for any UserAgent.
+/// This is a convenience implementation of ChatUserAgent for any Agent that implements
+/// ConsumerAgent and ProducerAgent.
 #[async_trait]
 impl<UA, Mrx, Mtx> ChatUserAgent for UA
 where
-    UA: UserAgent<Mrx = Mrx, Mtx = Mtx> + Send + Sync,
+    UA: ConsumerAgent<Mrx = Mrx> + ProducerAgent<Mtx = Mtx>,
+    UA: Send,
+
     for<'a> Mrx: TryFrom<Message<'a>> + Send,
     Mtx: TryInto<String>,
     Mtx: TryInto<CodeBlockFeedback>,
 {
-    type Error = UserAgentError<UA::SendingError, UA::ReceivingError>;
+    type Error = UserAgentError<UA, UA>;
 
     async fn receive_and_reply(
         &mut self,
