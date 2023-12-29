@@ -36,8 +36,6 @@ pub enum CollaborativeAgentResponse {
     CommentedCodeBlock(CommentedCodeBlock),
 }
 
-use super::collaborative_chat::UserTextMessage;
-
 #[async_trait]
 pub trait CollaborativeAgent {
     // Shared error should be the sufficient for both functions.
@@ -45,7 +43,8 @@ pub trait CollaborativeAgent {
 
     async fn receive_and_reply(
         &mut self,
-        message: UserTextMessage,
+        sender: &str,
+        message: &str,
     ) -> Result<CollaborativeAgentResponse, Self::Error>;
 
     /// We always request reply from the agent if execution was denied.

@@ -27,5 +27,5 @@ pub trait ProducerAgent {
 }
 
 pub trait NamedAgent {
-    fn name(&self) -> String;
+    fn name(&self) -> &str;
 }
