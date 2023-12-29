@@ -42,8 +42,6 @@ pub trait ChatUserAgent {
     ) -> Result<(), Self::Error>;
 }
 
-//use crate::user_agent::UserAgent;
-//
 pub enum UserAgentError<C, R>
 where
     C: ProducerAgent,
