@@ -30,7 +30,7 @@ where
     debug!("starting chat..");
 
     debug!("sending welcome message..");
-    let mut ua_response = user_agent
+    let ua_response = user_agent
         .receive_and_reply(UserTextMessage {
             sender: "system".to_string(),
             message:
@@ -40,79 +40,78 @@ where
         .await
         .map_err(CollaborativeChatError::RespondingAgent)?;
 
+    let mut ca_response = collaborative_agent
+        .receive_and_reply(ua_response)
+        .await
+        .map_err(CollaborativeChatError::CollaborativeAgent)?;
+
     loop {
         debug!("sending user message to collaborative_agent..");
-        let mut ca_response = collaborative_agent
-            .receive_and_reply(ua_response)
-            .await
-            .map_err(CollaborativeChatError::CollaborativeAgent)?;
 
-        user_agent
-            .receive(ca_response.clone())
-            .await
-            .map_err(CollaborativeChatError::ConsumerAgent)?;
+        match ca_response {
+            CollaborativeAgentResponse::CommentedCodeBlock(ref commented_code_block) => {
+                user_agent
+                    .receive(ca_response.clone())
+                    .await
+                    .map_err(CollaborativeChatError::ConsumerAgent)?;
 
-        if let CollaborativeAgentResponse::CommentedCodeBlock(commented_code_block) = ca_response {
-            match commented_code_block.request_execution {
-                true => {
-                    debug!("code execution requested. Sending code block to user_agent..");
+                match commented_code_block.request_execution {
+                    true => {
+                        debug!("code execution requested. Sending code block to user_agent..");
 
-                    let ua_feedback = user_agent
-                        .request_code_block_feedback(
-                            collaborative_agent.name(),
-                            &commented_code_block.comment,
-                            &commented_code_block.code_block,
-                        )
-                        .await
-                        .map_err(CollaborativeChatError::RequestCodeFeedback)?;
-                    match ua_feedback {
-                        CodeBlockFeedback::AllowExecution => {
-                            debug!("code execution allowed. Sending code block to collaborative_agent..");
-                        }
-                        CodeBlockFeedback::DenyExecution { reason } => {
-                            debug!(
+                        let ua_feedback = user_agent
+                            .request_code_block_feedback(
+                                collaborative_agent.name(),
+                                &commented_code_block.comment,
+                                &commented_code_block.code_block,
+                            )
+                            .await
+                            .map_err(CollaborativeChatError::RequestCodeFeedback)?;
+                        match ua_feedback {
+                            CodeBlockFeedback::AllowExecution => {
+                                debug!("code execution allowed. Executing code..");
+                                break;
+                            }
+                            CodeBlockFeedback::DenyExecution { reason } => {
+                                debug!(
                                 "code execution denied. Sending reason to collaborative_agent.."
                             );
 
-                            let ca_response = collaborative_agent
-                                .receive_and_reply(UserTextMessage {
-                                    sender: user_agent.name(),
-                                    message: format!("Code execution denied. Reason: {}", reason),
-                                })
-                                .await
-                                .map_err(CollaborativeChatError::CollaborativeAgent)?;
+                                ca_response = collaborative_agent
+                                    .deny_code_block_execution(
+                                        &commented_code_block.code_block,
+                                        reason,
+                                    )
+                                    .await
+                                    .map_err(CollaborativeChatError::CollaborativeAgent)?;
+                            }
                         }
                     }
-                }
-                false => {
-                    debug!("code execution not requested. Skipping feedback phase..");
+                    false => {
+                        debug!("code execution not requested. Skipping feedback phase..");
+                    }
                 }
             }
-        }
+            CollaborativeAgentResponse::Text(ref text) => {
+                debug!("sending text to user_agent..");
+                let ua_response = user_agent
+                    .receive_and_reply(UserTextMessage {
+                        sender: collaborative_agent.name(),
+                        message: text.clone(),
+                    })
+                    .await
+                    .map_err(CollaborativeChatError::RespondingAgent)?;
 
-        break;
+                debug!("sending user_agent response to collaborative_agent..");
+                ca_response = collaborative_agent
+                    .receive_and_reply(ua_response)
+                    .await
+                    .map_err(CollaborativeChatError::CollaborativeAgent)?;
+            }
+        }
     }
 
     Ok(())
 }
 
 use super::collaborative_agent::CommentedCodeBlock;
-
-pub async fn code_negotiation<UA, CA>(
-    mut user_agent: &UA,
-    mut collaborative_agent: &CA,
-    commented_code_block: CommentedCodeBlock,
-) -> Result<(), CollaborativeChatError<UA, CA>>
-where
-    UA: RespondingAgent<Mrx = UserTextMessage, Mtx = UserTextMessage> + Send + Sync + 'static,
-    UA: ConsumerAgent<Mrx = CollaborativeAgentResponse>,
-    UA: RequestCodeFeedback,
-    UA: NamedAgent,
-
-    CA: CollaborativeAgent,
-    CA: NamedAgent,
-{
-    todo!()
-}
-
-

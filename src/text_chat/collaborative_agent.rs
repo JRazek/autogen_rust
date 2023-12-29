@@ -40,6 +40,7 @@ use super::collaborative_chat::UserTextMessage;
 
 #[async_trait]
 pub trait CollaborativeAgent {
+    // Shared error should be the sufficient for both functions.
     type Error;
 
     async fn receive_and_reply(
@@ -75,7 +76,7 @@ pub trait CollaborativeAgent {
 
     async fn deny_code_block_execution(
         &mut self,
-        code_block: &CommentedCodeBlock,
+        code_block: &CodeBlock,
         feedback: String,
     ) -> Result<CollaborativeAgentResponse, Self::Error>;
 }
