@@ -76,13 +76,11 @@ pub trait CollaborativeAgent {
     async fn deny_code_block_execution(
         &mut self,
         code_block: &CodeBlock,
-        feedback: String,
+        feedback: &str,
     ) -> Result<CollaborativeAgentResponse, Self::Error>;
 
-    async fn receive_code_execution_result(
+    async fn receive_code_and_reply_to_execution_result(
         &mut self,
-        code_block: &CodeBlock,
-        code_execution_result: CodeBlockExecutionResult,
-        result: String,
-    ) -> Result<(), Self::Error>;
+        code_execution_result: &CodeBlockExecutionResult,
+    ) -> Result<CollaborativeAgentResponse, Self::Error>;
 }

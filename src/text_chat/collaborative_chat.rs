@@ -79,6 +79,13 @@ where
                                     .receive_code_execution_result(&execution_result)
                                     .await
                                     .map_err(CollaborativeChatError::ChatUserAgent)?;
+
+                                debug!("sending execution result to collaborative_agent..");
+
+                                ca_response = collaborative_agent
+                                    .receive_code_and_reply_to_execution_result(&execution_result)
+                                    .await
+                                    .map_err(CollaborativeChatError::CollaborativeAgent)?;
                             }
                             CodeBlockFeedback::DenyExecution { reason } => {
                                 debug!("code execution denied. Sending reason to collaborative_agent..");
@@ -86,7 +93,7 @@ where
                                 ca_response = collaborative_agent
                                     .deny_code_block_execution(
                                         &commented_code_block.code_block,
-                                        reason,
+                                        &reason,
                                     )
                                     .await
                                     .map_err(CollaborativeChatError::CollaborativeAgent)?;

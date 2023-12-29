@@ -1,6 +1,5 @@
 use super::chat_user_agent::ChatUserAgent;
 use super::collaborative_agent::CollaborativeAgent;
-use crate::agent_traits::{ConsumerAgent, RespondingAgent};
 
 use super::code::CodeExecutor;
 
