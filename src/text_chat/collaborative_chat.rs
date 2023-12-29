@@ -4,9 +4,13 @@ use crate::agent_traits::{ConsumerAgent, NamedAgent, RespondingAgent};
 
 use crate::user_agent::{RespondingAgentError, UserAgent};
 
+use super::code::{CodeBlockExecutionResult, CodeExecutor};
+
 use tracing::debug;
 
 use super::collaborative_chat_error::CollaborativeChatError;
+
+use tokio_util::sync::CancellationToken;
 
 #[derive(Clone)]
 pub struct UserTextMessage {
@@ -14,10 +18,12 @@ pub struct UserTextMessage {
     pub message: String,
 }
 
-pub async fn collaborative_chat<UA, CA>(
+pub async fn collaborative_chat<UA, CA, E>(
     mut user_agent: UA,
     mut collaborative_agent: CA,
-) -> Result<(), CollaborativeChatError<UA, CA>>
+    executor: E,
+    cancellation_token: CancellationToken,
+) -> Result<(), CollaborativeChatError<UA, CA, E>>
 where
     UA: RespondingAgent<Mrx = UserTextMessage, Mtx = UserTextMessage> + Send + Sync + 'static,
     UA: ConsumerAgent<Mrx = CollaborativeAgentResponse>,
@@ -26,6 +32,8 @@ where
 
     CA: CollaborativeAgent,
     CA: NamedAgent,
+
+    E: CodeExecutor,
 {
     debug!("starting chat..");
 
@@ -40,14 +48,13 @@ where
         .await
         .map_err(CollaborativeChatError::RespondingAgent)?;
 
+    debug!("sending user message to collaborative_agent..");
     let mut ca_response = collaborative_agent
         .receive_and_reply(ua_response)
         .await
         .map_err(CollaborativeChatError::CollaborativeAgent)?;
 
-    loop {
-        debug!("sending user message to collaborative_agent..");
-
+    while !cancellation_token.is_cancelled() {
         match ca_response {
             CollaborativeAgentResponse::CommentedCodeBlock(ref commented_code_block) => {
                 user_agent
@@ -70,12 +77,14 @@ where
                         match ua_feedback {
                             CodeBlockFeedback::AllowExecution => {
                                 debug!("code execution allowed. Executing code..");
-                                break;
+
+                                let execution_result = executor
+                                    .execute_code_block(&commented_code_block.code_block)
+                                    .await
+                                    .map_err(CollaborativeChatError::CodeExecutor)?;
                             }
                             CodeBlockFeedback::DenyExecution { reason } => {
-                                debug!(
-                                "code execution denied. Sending reason to collaborative_agent.."
-                            );
+                                debug!("code execution denied. Sending reason to collaborative_agent..");
 
                                 ca_response = collaborative_agent
                                     .deny_code_block_execution(
@@ -113,5 +122,3 @@ where
 
     Ok(())
 }
-
-use super::collaborative_agent::CommentedCodeBlock;

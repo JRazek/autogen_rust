@@ -1,6 +1,6 @@
 use async_trait::async_trait;
 
-use super::code::CodeBlock;
+use super::code::{CodeBlock, CodeBlockExecutionResult};
 
 /// This should correspond to the response from the LLM.
 /// User: Please write Hello World in Python and then execute it.
@@ -79,4 +79,11 @@ pub trait CollaborativeAgent {
         code_block: &CodeBlock,
         feedback: String,
     ) -> Result<CollaborativeAgentResponse, Self::Error>;
+
+    async fn receive_code_execution_result(
+        &mut self,
+        code_block: &CodeBlock,
+        code_execution_result: CodeBlockExecutionResult,
+        result: String,
+    ) -> Result<(), Self::Error>;
 }
