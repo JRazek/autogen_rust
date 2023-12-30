@@ -1,6 +1,6 @@
-use autogen::agent_traits::{ConsumerAgent, ProducerAgent};
+use autogen::agent_traits::{ConsumerAgent, NamedAgent, ProducerAgent};
 use autogen::text_chat::chat_user_agent::ChatUserAgent;
-use autogen::text_chat::code::{CodeBlock, CodeBlockExecutionResult};
+use autogen::text_chat::code::{CodeBlock, CodeBlockExecutionResult, CodeExecutor};
 use autogen::text_chat::collaborative_agent::{
     CollaborativeAgent, CollaborativeAgentResponse, CommentedCodeBlock,
 };
@@ -11,7 +11,7 @@ use async_trait::async_trait;
 
 use async_std::io;
 
-use tracing::debug;
+use tracing::{debug, info};
 
 enum Error {
     Io(io::Error),
@@ -21,6 +21,12 @@ enum Error {
 /// UserAgent is a struct that represents a user of the system which can run code.
 #[derive(Clone)]
 struct LocalUserAgent;
+
+impl NamedAgent for LocalUserAgent {
+    fn name(&self) -> &str {
+        "LocalUserAgent"
+    }
+}
 
 #[async_trait]
 impl ProducerAgent for LocalUserAgent {
@@ -127,42 +133,92 @@ impl<'a> From<ChatUserAgentMessage<'a>> for LocalMessage {
     }
 }
 
-struct LlmMock {
+use autogen::text_chat::collaborative_agent::Message as CollaborativeAgentMessage;
+
+struct LlmMock<'a> {
+    _phantom: std::marker::PhantomData<&'a ()>,
     request_index: usize,
 }
 
+impl NamedAgent for LlmMock<'_> {
+    fn name(&self) -> &str {
+        "LlmMock"
+    }
+}
+
+impl Default for LlmMock<'_> {
+    fn default() -> Self {
+        Self {_phantom: std::marker::PhantomData, request_index: 0 }
+    }
+}
+
 #[async_trait]
-impl ConsumerAgent for LlmMock {
-    type Mrx = LocalMessage;
+impl<'a> ConsumerAgent for LlmMock<'a> {
+    type Mrx = CollaborativeAgentMessage<'a>;
     type Error = Error;
 
-    async fn receive_message(&mut self, _: LocalMessage) -> Result<(), Self::Error> {
-        let response = match self.request_index {
-            0 => r#"
-                I hate python. Hope you like Rust!.
-                ```rust
-                    fn main() {
-                        println!("Hello, world!");
-                    }
-                ```"#
-                .to_string(),
-            _ => "sorry, im out of ideas..".to_string(),
-        };
-
+    async fn receive_message(&mut self, _: Self::Mrx) -> Result<(), Self::Error> {
         self.request_index += 1;
+
+        info!("LlmMock received message {}", self.request_index);
 
         Ok(())
     }
 }
 
-impl Into<CollaborativeAgentResponse> for LocalMessage {
-    fn into(self) -> CollaborativeAgentResponse {
-        todo!()
+#[async_trait]
+impl ProducerAgent for LlmMock<'_> {
+    type Mtx = CollaborativeAgentResponse;
+    type Error = Error;
+
+    async fn send_message(&mut self) -> Result<Self::Mtx, Self::Error> {
+        let response = match self.request_index {
+            0 => CollaborativeAgentResponse::CommentedCodeBlock(CommentedCodeBlock {
+                code_block: CodeBlock {
+                    code: r#"
+                        fn main() {
+                            println!("Hello, world!");
+                        }
+                    "#
+                    .to_string(),
+                    language: "rust".to_string(),
+                },
+                comment: "I hate python. Hope you like Rust!".to_string(),
+                request_execution: true,
+            }),
+            _ => CollaborativeAgentResponse::Text("sorry, im out of ideas..".to_string()),
+        };
+
+        Ok(response)
     }
 }
 
+use autogen::text_chat::collaborative_chat::collaborative_chat;
+
+struct LocalCodeExecutor;
+
+#[async_trait]
+impl CodeExecutor for LocalCodeExecutor {
+    type Error = Error;
+
+    async fn execute_code_block(
+        &self,
+        code_block: &CodeBlock,
+    ) -> Result<CodeBlockExecutionResult, Self::Error> {
+        debug!("Enter execute_code_block");
+        debug!("code_block: {:?}", code_block);
+
+        Ok(CodeBlockExecutionResult::Success("".to_string()))
+    }
+}
+
+use tokio_util::sync::CancellationToken;
 
 fn main() {
     let user_agent = LocalUserAgent;
+    let llm_mock = LlmMock::default();
+    let executor = LocalCodeExecutor;
+    let cancellation_token = CancellationToken::new();
 
+    collaborative_chat(user_agent, llm_mock, executor, cancellation_token);
 }

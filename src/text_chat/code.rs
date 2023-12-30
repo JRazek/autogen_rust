@@ -1,11 +1,12 @@
 use async_trait::async_trait;
 
-#[derive(Clone)]
+#[derive(Debug, Clone)]
 pub struct CodeBlock {
     pub language: String,
     pub code: String,
 }
 
+#[derive(Debug)]
 pub enum CodeBlockExecutionResult {
     Success(String),
     Failure(String),

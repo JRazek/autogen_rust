@@ -23,7 +23,7 @@ use crate::agent_traits::{ConsumerAgent, ProducerAgent};
 ///    request_execution: true,
 /// }
 
-#[derive(Clone)]
+#[derive(Debug, Clone)]
 pub struct CommentedCodeBlock {
     pub comment: String,
     pub code_block: CodeBlock,
@@ -32,7 +32,7 @@ pub struct CommentedCodeBlock {
 
 /// Agent may simply respond with a text message or with a code blocks.
 
-#[derive(Clone)]
+#[derive(Debug, Clone)]
 pub enum CollaborativeAgentResponse {
     Text(String),
     CommentedCodeBlock(CommentedCodeBlock),
