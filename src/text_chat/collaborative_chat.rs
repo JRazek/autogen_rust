@@ -32,15 +32,16 @@ where
     debug!("sending welcome message..");
     let ua_response = user_agent
         .receive_and_reply(
-            "system",
-            "hello, this is a collaborative chat. You may ask collaborative_agent for help.",
+            "system".to_string(),
+            "hello, this is a collaborative chat. You may ask collaborative_agent for help."
+                .to_string(),
         )
         .await
         .map_err(CollaborativeChatError::ChatUserAgent)?;
 
     debug!("sending user message to collaborative_agent..");
     let mut ca_response = collaborative_agent
-        .receive_and_reply(user_agent.name(), &ua_response)
+        .receive_and_reply(user_agent.name().to_string(), ua_response.clone())
         .await
         .map_err(CollaborativeChatError::CollaborativeAgent)?;
 
@@ -48,7 +49,10 @@ where
         match ca_response {
             CollaborativeAgentResponse::CommentedCodeBlock(ref commented_code_block) => {
                 user_agent
-                    .silent_receive_collaborative_agent_response(collaborative_agent.name(), &ca_response)
+                    .silent_receive_collaborative_agent_response(
+                        collaborative_agent.name().to_string(),
+                        ca_response.clone(),
+                    )
                     .await
                     .map_err(CollaborativeChatError::ChatUserAgent)?;
 
@@ -58,9 +62,9 @@ where
 
                         let ua_feedback = user_agent
                             .request_code_block_feedback(
-                                collaborative_agent.name(),
-                                &commented_code_block.comment,
-                                &commented_code_block.code_block,
+                                collaborative_agent.name().to_string(),
+                                commented_code_block.comment.clone(),
+                                commented_code_block.code_block.clone(),
                             )
                             .await
                             .map_err(CollaborativeChatError::ChatUserAgent)?;
@@ -76,14 +80,14 @@ where
 
                                 debug!("sending execution result to user_agent..");
                                 user_agent
-                                    .receive_code_execution_result(&execution_result)
+                                    .receive_code_execution_result(execution_result.clone())
                                     .await
                                     .map_err(CollaborativeChatError::ChatUserAgent)?;
 
                                 debug!("sending execution result to collaborative_agent..");
 
                                 ca_response = collaborative_agent
-                                    .receive_code_and_reply_to_execution_result(&execution_result)
+                                    .receive_code_and_reply_to_execution_result(execution_result)
                                     .await
                                     .map_err(CollaborativeChatError::CollaborativeAgent)?;
                             }
@@ -92,8 +96,8 @@ where
 
                                 ca_response = collaborative_agent
                                     .deny_code_block_execution(
-                                        &commented_code_block.code_block,
-                                        &reason,
+                                        commented_code_block.code_block.clone(),
+                                        reason,
                                     )
                                     .await
                                     .map_err(CollaborativeChatError::CollaborativeAgent)?;
@@ -102,19 +106,20 @@ where
                     }
                     false => {
                         debug!("code execution not requested. Skipping feedback phase..");
+                        todo!()
                     }
                 }
             }
-            CollaborativeAgentResponse::Text(ref text) => {
+            CollaborativeAgentResponse::Text(text) => {
                 debug!("sending text to user_agent..");
                 let ua_response = user_agent
-                    .receive_and_reply(collaborative_agent.name(), &text)
+                    .receive_and_reply(collaborative_agent.name().to_string(), text)
                     .await
                     .map_err(CollaborativeChatError::ChatUserAgent)?;
 
                 debug!("sending user_agent response to collaborative_agent..");
                 ca_response = collaborative_agent
-                    .receive_and_reply(user_agent.name(), &ua_response)
+                    .receive_and_reply(user_agent.name().to_string(), ua_response)
                     .await
                     .map_err(CollaborativeChatError::CollaborativeAgent)?;
             }

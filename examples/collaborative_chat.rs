@@ -1,9 +1,6 @@
 use autogen::agent_traits::{ConsumerAgent, NamedAgent, ProducerAgent};
-use autogen::text_chat::chat_user_agent::ChatUserAgent;
 use autogen::text_chat::code::{CodeBlock, CodeBlockExecutionResult, CodeExecutor};
-use autogen::text_chat::collaborative_agent::{
-    CollaborativeAgent, CollaborativeAgentResponse, CommentedCodeBlock,
-};
+use autogen::text_chat::collaborative_agent::{CollaborativeAgentResponse, CommentedCodeBlock};
 
 use autogen::text_chat::chat_user_agent::CodeBlockFeedback;
 
@@ -11,6 +8,7 @@ use async_std::io;
 
 use tracing::{debug, info};
 
+#[derive(Debug)]
 enum Error {
     Io(io::Error),
 }
@@ -81,8 +79,8 @@ impl Into<CodeBlockFeedback> for LocalMessage {
 
 use autogen::text_chat::chat_user_agent::Message as ChatUserAgentMessage;
 
-impl<'a> From<ChatUserAgentMessage<'a>> for LocalMessage {
-    fn from(value: ChatUserAgentMessage<'a>) -> Self {
+impl From<ChatUserAgentMessage> for LocalMessage {
+    fn from(value: ChatUserAgentMessage) -> Self {
         let res = match value {
             ChatUserAgentMessage::Text { sender, message } => Self {
                 message: format!("{}: {}", sender, message),
@@ -131,28 +129,24 @@ impl<'a> From<ChatUserAgentMessage<'a>> for LocalMessage {
 
 use autogen::text_chat::collaborative_agent::Message as CollaborativeAgentMessage;
 
-struct LlmMock<'a> {
-    _phantom: std::marker::PhantomData<&'a ()>,
+struct LlmMock {
     request_index: usize,
 }
 
-impl NamedAgent for LlmMock<'_> {
+impl NamedAgent for LlmMock {
     fn name(&self) -> &str {
         "LlmMock"
     }
 }
 
-impl Default for LlmMock<'_> {
+impl Default for LlmMock {
     fn default() -> Self {
-        Self {
-            _phantom: std::marker::PhantomData,
-            request_index: 0,
-        }
+        Self { request_index: 0 }
     }
 }
 
-impl<'a> ConsumerAgent for LlmMock<'a> {
-    type Mrx = CollaborativeAgentMessage<'a>;
+impl ConsumerAgent for LlmMock {
+    type Mrx = CollaborativeAgentMessage;
     type Error = Error;
 
     async fn receive_message(&mut self, _: Self::Mrx) -> Result<(), Self::Error> {
@@ -164,7 +158,7 @@ impl<'a> ConsumerAgent for LlmMock<'a> {
     }
 }
 
-impl ProducerAgent for LlmMock<'_> {
+impl ProducerAgent for LlmMock {
     type Mtx = CollaborativeAgentResponse;
     type Error = Error;
 
@@ -210,11 +204,14 @@ impl CodeExecutor for LocalCodeExecutor {
 
 use tokio_util::sync::CancellationToken;
 
-fn main() {
+#[tokio::main]
+async fn main() {
     let user_agent = LocalUserAgent;
     let llm_mock = LlmMock::default();
     let executor = LocalCodeExecutor;
     let cancellation_token = CancellationToken::new();
 
-    collaborative_chat(user_agent, llm_mock, executor, cancellation_token);
+    collaborative_chat(user_agent, llm_mock, executor, cancellation_token)
+        .await
+        .unwrap();
 }

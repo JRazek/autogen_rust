@@ -2,6 +2,8 @@ use super::code::{CodeBlock, CodeBlockExecutionResult};
 
 use crate::agent_traits::{ConsumerAgent, ProducerAgent};
 
+use super::collaborative_agent_error::CollaborativeAgentError;
+
 /// This should correspond to the response from the LLM.
 /// User: Please write Hello World in Python and then execute it.
 ///
@@ -42,8 +44,8 @@ pub trait CollaborativeAgent {
 
     async fn receive_and_reply(
         &mut self,
-        sender: &str,
-        message: &str,
+        sender: String,
+        message: String,
     ) -> Result<CollaborativeAgentResponse, Self::Error>;
 
     /// We always request reply from the agent if execution was denied.
@@ -74,37 +76,26 @@ pub trait CollaborativeAgent {
 
     async fn deny_code_block_execution(
         &mut self,
-        code_block: &CodeBlock,
-        feedback: &str,
+        code_block: CodeBlock,
+        feedback: String,
     ) -> Result<CollaborativeAgentResponse, Self::Error>;
 
     async fn receive_code_and_reply_to_execution_result(
         &mut self,
-        code_execution_result: &CodeBlockExecutionResult,
+        code_execution_result: CodeBlockExecutionResult,
     ) -> Result<CollaborativeAgentResponse, Self::Error>;
 }
 
-pub enum CollaborativeAgentError<C, R>
-where
-    C: ProducerAgent,
-    R: ConsumerAgent,
-{
-    Sending(C::Error),
-    Receiving(R::Error),
-    TryFromMessage,
-    TryIntoString,
-}
-
-pub enum Message<'a> {
+pub enum Message {
     Text {
-        sender: &'a str,
-        message: &'a str,
+        sender: String,
+        message: String,
     },
     CodeExecutionDenied {
-        comment: &'a str,
-        code_block: &'a CodeBlock,
+        comment: String,
+        code_block: CodeBlock,
     },
-    CodeExecutionResult(&'a CodeBlockExecutionResult),
+    CodeExecutionResult(CodeBlockExecutionResult),
 }
 
 ///This may be used when the agent returns output as a string or any other type.
@@ -113,25 +104,30 @@ where
     CA: ConsumerAgent<Mrx = Mrx> + ProducerAgent<Mtx = Mtx>,
     CA: Send,
 
-    for<'a> Mrx: TryFrom<Message<'a>> + Send,
+    Mrx: TryFrom<Message> + Send,
     Mtx: TryInto<CollaborativeAgentResponse>,
 {
     type Error = CollaborativeAgentError<CA, CA>;
 
     async fn receive_and_reply(
         &mut self,
-        sender: &str,
-        message: &str,
+        sender: String,
+        message: String,
     ) -> Result<CollaborativeAgentResponse, Self::Error> {
+        let sender = sender.to_owned();
+        let message = message.to_owned();
+
         let message = Message::Text { sender, message };
 
         send_and_get_reply(message, self).await
     }
     async fn deny_code_block_execution(
         &mut self,
-        code_block: &CodeBlock,
-        feedback: &str,
+        code_block: CodeBlock,
+        feedback: String,
     ) -> Result<CollaborativeAgentResponse, Self::Error> {
+        let feedback = feedback.to_owned();
+
         let message = Message::CodeExecutionDenied {
             comment: feedback,
             code_block,
@@ -142,7 +138,7 @@ where
 
     async fn receive_code_and_reply_to_execution_result(
         &mut self,
-        code_execution_result: &CodeBlockExecutionResult,
+        code_execution_result: CodeBlockExecutionResult,
     ) -> Result<CollaborativeAgentResponse, Self::Error> {
         let message = Message::CodeExecutionResult(code_execution_result);
 
@@ -151,14 +147,14 @@ where
 }
 
 async fn send_and_get_reply<CA, Mrx, Mtx>(
-    message: Message<'_>,
+    message: Message,
     ca: &mut CA,
 ) -> Result<CollaborativeAgentResponse, CollaborativeAgentError<CA, CA>>
 where
     CA: ConsumerAgent<Mrx = Mrx> + ProducerAgent<Mtx = Mtx>,
     CA: Send,
 
-    for<'a> Mrx: TryFrom<Message<'a>> + Send,
+    Mrx: TryFrom<Message> + Send,
     Mtx: TryInto<CollaborativeAgentResponse>,
 {
     let message = Mrx::try_from(message).map_err(|_| CollaborativeAgentError::TryFromMessage)?;

@@ -4,7 +4,7 @@ pub struct CodeBlock {
     pub code: String,
 }
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub enum CodeBlockExecutionResult {
     Success(String),
     Failure(String),
