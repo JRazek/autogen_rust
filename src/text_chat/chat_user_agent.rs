@@ -1,5 +1,3 @@
-use async_trait::async_trait;
-
 use super::collaborative_agent::CollaborativeAgentResponse;
 
 use super::code::CodeBlock;
@@ -13,7 +11,6 @@ use super::code::CodeBlockExecutionResult;
 
 use crate::agent_traits::{ConsumerAgent, ProducerAgent};
 
-#[async_trait]
 pub trait ChatUserAgent {
     type Error;
 
@@ -72,7 +69,6 @@ pub enum Message<'a> {
 
 /// This is a convenience implementation of ChatUserAgent for any Agent that implements
 /// ConsumerAgent and ProducerAgent.
-#[async_trait]
 impl<UA, Mrx, Mtx> ChatUserAgent for UA
 where
     UA: ConsumerAgent<Mrx = Mrx> + ProducerAgent<Mtx = Mtx>,

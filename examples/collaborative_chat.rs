@@ -7,8 +7,6 @@ use autogen::text_chat::collaborative_agent::{
 
 use autogen::text_chat::chat_user_agent::CodeBlockFeedback;
 
-use async_trait::async_trait;
-
 use async_std::io;
 
 use tracing::{debug, info};
@@ -28,7 +26,6 @@ impl NamedAgent for LocalUserAgent {
     }
 }
 
-#[async_trait]
 impl ProducerAgent for LocalUserAgent {
     type Mtx = LocalMessage;
     type Error = Error;
@@ -44,7 +41,6 @@ impl ProducerAgent for LocalUserAgent {
     }
 }
 
-#[async_trait]
 impl ConsumerAgent for LocalUserAgent {
     type Mrx = LocalMessage;
     type Error = Error;
@@ -148,11 +144,13 @@ impl NamedAgent for LlmMock<'_> {
 
 impl Default for LlmMock<'_> {
     fn default() -> Self {
-        Self {_phantom: std::marker::PhantomData, request_index: 0 }
+        Self {
+            _phantom: std::marker::PhantomData,
+            request_index: 0,
+        }
     }
 }
 
-#[async_trait]
 impl<'a> ConsumerAgent for LlmMock<'a> {
     type Mrx = CollaborativeAgentMessage<'a>;
     type Error = Error;
@@ -166,7 +164,6 @@ impl<'a> ConsumerAgent for LlmMock<'a> {
     }
 }
 
-#[async_trait]
 impl ProducerAgent for LlmMock<'_> {
     type Mtx = CollaborativeAgentResponse;
     type Error = Error;
@@ -197,7 +194,6 @@ use autogen::text_chat::collaborative_chat::collaborative_chat;
 
 struct LocalCodeExecutor;
 
-#[async_trait]
 impl CodeExecutor for LocalCodeExecutor {
     type Error = Error;
 

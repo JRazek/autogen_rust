@@ -1,5 +1,3 @@
-use async_trait::async_trait;
-
 #[derive(Debug, Clone)]
 pub struct CodeBlock {
     pub language: String,
@@ -12,7 +10,6 @@ pub enum CodeBlockExecutionResult {
     Failure(String),
 }
 
-#[async_trait]
 pub trait CodeExecutor {
     type Error;
 

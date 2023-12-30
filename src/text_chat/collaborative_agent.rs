@@ -1,5 +1,3 @@
-use async_trait::async_trait;
-
 use super::code::{CodeBlock, CodeBlockExecutionResult};
 
 use crate::agent_traits::{ConsumerAgent, ProducerAgent};
@@ -38,7 +36,6 @@ pub enum CollaborativeAgentResponse {
     CommentedCodeBlock(CommentedCodeBlock),
 }
 
-#[async_trait]
 pub trait CollaborativeAgent {
     // Shared error should be the sufficient for both functions.
     type Error;
@@ -111,7 +108,6 @@ pub enum Message<'a> {
 }
 
 ///This may be used when the agent returns output as a string or any other type.
-#[async_trait]
 impl<CA, Mrx, Mtx> CollaborativeAgent for CA
 where
     CA: ConsumerAgent<Mrx = Mrx> + ProducerAgent<Mtx = Mtx>,

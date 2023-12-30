@@ -1,6 +1,3 @@
-use async_trait::async_trait;
-
-#[async_trait]
 pub trait ConsumerAgent {
     type Mrx;
     type Error;
@@ -8,7 +5,6 @@ pub trait ConsumerAgent {
     async fn receive_message(&mut self, mrx: Self::Mrx) -> Result<(), Self::Error>;
 }
 
-#[async_trait]
 pub trait ProducerAgent {
     type Mtx;
     type Error;

@@ -186,17 +186,6 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "e1d90cd0b264dfdd8eb5bad0a2c217c1f88fa96a8573f40e7b12de23fb468f46"
 
 [[package]]
-name = "async-trait"
-version = "0.1.75"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "fdf6721fb0140e4f897002dd086c06f6c27775df19cfe1fccb21181a48fd2c98"
-dependencies = [
- "proc-macro2",
- "quote",
- "syn",
-]
-
-[[package]]
 name = "atomic-waker"
 version = "1.1.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -213,7 +202,6 @@ name = "autogen"
 version = "0.1.0"
 dependencies = [
  "async-std",
- "async-trait",
  "futures",
  "regex",
  "thiserror",
@@ -222,6 +210,7 @@ dependencies = [
  "tracing",
  "tracing-appender",
  "tracing-subscriber 0.3.18",
+ "trait-variant",
 ]
 
 [[package]]
@@ -1134,6 +1123,17 @@ dependencies = [
  "tracing",
  "tracing-core",
  "tracing-log",
+]
+
+[[package]]
+name = "trait-variant"
+version = "0.1.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "6a9183102ccb002e12e9b0f02bb3c4e85699b8cc5844eaf55496e22eff9a6c01"
+dependencies = [
+ "proc-macro2",
+ "quote",
+ "syn",
 ]
 
 [[package]]
