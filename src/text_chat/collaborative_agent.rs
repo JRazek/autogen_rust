@@ -52,9 +52,11 @@ pub trait CollaborativeAgent {
     /// User feedback is obligatory thus the agent may respond to that and potentially fix the
     /// issue.
     ///
-    /// Example:
     ///
-    /// let reply = collaborative_agent.request_reply("Please write Hello World in Python and then execute it.".to_string())
+    /// ```ignore
+    /// use autogen::text_chat::code::CodeBlock;
+    ///
+    /// let reply = collaborative_agent.receive_and_reply("Please write Hello World in Python and then execute it.".to_string())
     ///
     /// assert_eq!(reply,
     ///     CollaborativeAgentResponse::CodeBlock(
@@ -62,16 +64,19 @@ pub trait CollaborativeAgent {
     ///            comment: "Certainly I can write Hello World in Python. Here it is:".to_string(),
     ///            code_block: CodeBlock {
     ///                code: "launch_missiles()".to_string(),
-    ///                language: Language::Python,
+    ///                language: "python".to_string(),
     ///            },
     ///            request_execution: true,
     ///         }
     ///     )
     /// );
     ///
-    /// let fixed_code = collaborative_agent.denied_code_block_execution("Please do not nuke us.".to_string());
-    /// // we may repeat the same process until agent decides that it no longer has an interest in
-    /// // destroying the world.
+    /// let fixed_code = collaborative_agent.deny_code_block_execution("Please do not nuke us.".to_string());
+    ///
+    /// ```
+    ///
+    /// we may repeat the same process until agent decides that it no longer has an interest in
+    /// destroying the world.
     ///
 
     async fn deny_code_block_execution(
@@ -98,7 +103,12 @@ pub enum Message {
     CodeExecutionResult(CodeBlockExecutionResult),
 }
 
-///This may be used when the agent returns output as a string or any other type.
+/// This may be used when the agent returns output as a string or any other type.
+/// One may imagine that 3rd party LLM provides a JSON response.
+/// In that case we may simply implement the communication via ConsumerAgent and ProducerAgent and
+/// then use after implementing TryFrom<Message> and TryInto<CollaborativeAgentResponse>, we may
+/// use this trait implementation in collaborative chat.
+
 impl<CA, Mrx, Mtx> CollaborativeAgent for CA
 where
     CA: ConsumerAgent<Mrx = Mrx> + ProducerAgent<Mtx = Mtx>,
@@ -146,6 +156,7 @@ where
     }
 }
 
+/// Helper function.
 async fn send_and_get_reply<CA, Mrx, Mtx>(
     message: Message,
     ca: &mut CA,

@@ -22,6 +22,10 @@ impl<SA: SystemAgent> NamedAgent for SA {
     }
 }
 
+/// Regarding Assignment requirement to provide grouping chat for collaboration.
+/// Even though this accepts a single collaborative agent, it is not a problem to create a specific implementation of an agent that would accumulate multiple collaborative agents.
+
+/// This function is the main entry point for the collaborative chat.
 pub async fn collaborative_chat<UA, CA, SA, E>(
     mut user_agent: UA,
     mut collaborative_agent: CA,

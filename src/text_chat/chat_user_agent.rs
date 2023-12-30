@@ -13,6 +13,7 @@ pub enum CodeBlockFeedback {
     DenyExecution { reason: String },
 }
 
+/// This trait is used by the collaborative chat to communicate with the user.
 pub trait ChatUserAgent {
     type Error;
 
@@ -84,7 +85,10 @@ where
             .await
             .map_err(ChatUserAgentError::Receiving)?;
 
-        let response = self.send_message().await.map_err(ChatUserAgentError::Sending)?;
+        let response = self
+            .send_message()
+            .await
+            .map_err(ChatUserAgentError::Sending)?;
 
         let response = response
             .try_into()
@@ -127,7 +131,10 @@ where
             .await
             .map_err(ChatUserAgentError::Receiving)?;
 
-        let response = self.send_message().await.map_err(ChatUserAgentError::Sending)?;
+        let response = self
+            .send_message()
+            .await
+            .map_err(ChatUserAgentError::Sending)?;
 
         let response = response
             .try_into()
