@@ -12,9 +12,20 @@ use super::collaborative_chat_error::CollaborativeChatError;
 
 use tokio_util::sync::CancellationToken;
 
-pub async fn collaborative_chat<UA, CA, E>(
+pub trait SystemAgent {
+    fn initial_message(&self) -> String;
+}
+
+impl<SA: SystemAgent> NamedAgent for SA {
+    fn name(&self) -> &str {
+        "system"
+    }
+}
+
+pub async fn collaborative_chat<UA, CA, SA, E>(
     mut user_agent: UA,
     mut collaborative_agent: CA,
+    system_agent: SA,
     executor: E,
     cancellation_token: CancellationToken,
 ) -> Result<(), CollaborativeChatError<UA, CA, E>>
@@ -25,6 +36,8 @@ where
     CA: CollaborativeAgent,
     CA: NamedAgent,
 
+    SA: SystemAgent,
+
     E: CodeExecutor,
 {
     debug!("starting chat..");
@@ -32,9 +45,8 @@ where
     debug!("sending welcome message..");
     let ua_response = user_agent
         .receive_and_reply(
-            "system".to_string(),
-            "hello, this is a collaborative chat. You may ask collaborative_agent for help."
-                .to_string(),
+            system_agent.name().to_string(),
+            system_agent.initial_message(),
         )
         .await
         .map_err(CollaborativeChatError::ChatUserAgent)?;

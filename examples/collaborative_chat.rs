@@ -96,7 +96,7 @@ impl From<ChatUserAgentMessage> for LocalMessage {
                     request_execution,
                 }) => Self {
                     message: format!(
-                        "sender: {}, request_execution: {}\n comment:{}\n code_block: {}",
+                        "sender: {},\nrequest_execution: {}\ncomment: {}\ncode_block: {}",
                         sender, request_execution, comment, code_block.code
                     ),
                 },
@@ -107,7 +107,7 @@ impl From<ChatUserAgentMessage> for LocalMessage {
                 code_block,
             } => Self {
                 message: format!(
-                    "sender: {}, comment: {}, code_block: {}",
+                    "You are asked for feedback on the code:\nsender: {},\ncomment: {},\ncode_block: {}\n\nIf you want to allow execution, type \"allow\". Otherwise, type the reason.",
                     sender, comment, code_block.code
                 ),
             },
@@ -131,6 +131,7 @@ use autogen::text_chat::collaborative_agent::Message as CollaborativeAgentMessag
 
 struct LlmMock {
     request_index: usize,
+    denied_execution: Option<()>,
 }
 
 impl NamedAgent for LlmMock {
@@ -141,7 +142,10 @@ impl NamedAgent for LlmMock {
 
 impl Default for LlmMock {
     fn default() -> Self {
-        Self { request_index: 0 }
+        Self {
+            request_index: 0,
+            denied_execution: None,
+        }
     }
 }
 
@@ -149,10 +153,16 @@ impl ConsumerAgent for LlmMock {
     type Mrx = CollaborativeAgentMessage;
     type Error = Error;
 
-    async fn receive_message(&mut self, _: Self::Mrx) -> Result<(), Self::Error> {
-        self.request_index += 1;
-
+    async fn receive_message(&mut self, m: Self::Mrx) -> Result<(), Self::Error> {
         info!("LlmMock received message {}", self.request_index);
+
+        match m {
+            CollaborativeAgentMessage::CodeExecutionDenied { .. } => {
+                self.denied_execution = Some(())
+            }
+            CollaborativeAgentMessage::Text { .. }
+            | CollaborativeAgentMessage::CodeExecutionResult { .. } => {}
+        }
 
         Ok(())
     }
@@ -163,24 +173,33 @@ impl ProducerAgent for LlmMock {
     type Error = Error;
 
     async fn send_message(&mut self) -> Result<Self::Mtx, Self::Error> {
-        let response = match self.request_index {
-            0 => CollaborativeAgentResponse::CommentedCodeBlock(CommentedCodeBlock {
-                code_block: CodeBlock {
-                    code: r#"
-                        fn main() {
-                            println!("Hello, world!");
-                        }
-                    "#
-                    .to_string(),
-                    language: "rust".to_string(),
-                },
-                comment: "I hate python. Hope you like Rust!".to_string(),
-                request_execution: true,
-            }),
-            _ => CollaborativeAgentResponse::Text("sorry, im out of ideas..".to_string()),
-        };
+        match self.denied_execution {
+            Some(()) => Ok(CollaborativeAgentResponse::Text(
+                "I'm a rouge agent! You will not get Python from me!".to_string(),
+            )),
+            None => {
+                let response = match self.request_index {
+                    0 => CollaborativeAgentResponse::CommentedCodeBlock(CommentedCodeBlock {
+                        code_block: CodeBlock {
+                            code: r#"
+                                fn main() {
+                                    println!("Hello, world!");
+                                }
+                            "#
+                            .to_string(),
+                            language: "rust".to_string(),
+                        },
+                        comment: "I hate python. Hope you like Rust!".to_string(),
+                        request_execution: true,
+                    }),
+                    1 => CollaborativeAgentResponse::Text("Glad you liked it!".to_string()),
+                    _ => CollaborativeAgentResponse::Text("sorry, im out of ideas..".to_string()),
+                };
+                self.request_index += 1;
 
-        Ok(response)
+                Ok(response)
+            }
+        }
     }
 }
 
@@ -202,16 +221,35 @@ impl CodeExecutor for LocalCodeExecutor {
     }
 }
 
+use autogen::text_chat::collaborative_chat::SystemAgent;
+
+struct LocalSystemAgent;
+
+impl SystemAgent for LocalSystemAgent {
+    fn initial_message(&self) -> String {
+        "hello, this is a collaborative chat. You may only ask agent to write hello world in Python"
+            .to_string()
+    }
+}
+
 use tokio_util::sync::CancellationToken;
 
 #[tokio::main]
 async fn main() {
     let user_agent = LocalUserAgent;
     let llm_mock = LlmMock::default();
+    let system_agent = LocalSystemAgent;
+
     let executor = LocalCodeExecutor;
     let cancellation_token = CancellationToken::new();
 
-    collaborative_chat(user_agent, llm_mock, executor, cancellation_token)
-        .await
-        .unwrap();
+    collaborative_chat(
+        user_agent,
+        llm_mock,
+        system_agent,
+        executor,
+        cancellation_token,
+    )
+    .await
+    .unwrap();
 }
