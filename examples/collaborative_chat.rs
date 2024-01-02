@@ -13,8 +13,6 @@ enum Error {
     Io(io::Error),
 }
 
-//make it as a trait
-/// UserAgent is a struct that represents a user of the system which can run code.
 #[derive(Clone)]
 struct LocalUserAgent;
 
