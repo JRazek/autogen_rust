@@ -38,6 +38,9 @@ pub enum CollaborativeAgentResponse {
     CommentedCodeBlock(CommentedCodeBlock),
 }
 
+/// Similarly to the [super::chat_user_agent::ChatUserAgent], I believe its a better choice to have a separate trait for
+/// this purpose and then implement it for the [ConsumerAgent] and [ProducerAgent].
+
 pub trait CollaborativeAgent {
     // Shared error should be the sufficient for both functions.
     type Error;

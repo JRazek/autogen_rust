@@ -14,6 +14,12 @@ pub enum CodeBlockFeedback {
 }
 
 /// This trait is used by the collaborative chat to communicate with the user.
+/// Even though it is implemented for all the ConsumerAgents and ProducerAgents,
+/// I believe it is better to have a separate trait for this purpose.
+/// Consumer/Producer force user to dynamically distiguish between the types of queries.
+/// If used with stdin/stdout Consumer/Producer apprach will probably be better (unless we want
+/// custom formatting for different inputs), but in the case of tests or other implementations it might be easier and more explicit to use this trait
+
 pub trait ChatUserAgent {
     type Error;
 
